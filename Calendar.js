@@ -167,15 +167,21 @@ const Calendar = (function ({ defaultCalendarId }) {
 
       const formattedEvents = limitedEvents.map(event => {
         const eventResult = {
-          id: event.getId(),
           title: event.getTitle(),
           description: event.getDescription(),
-          location: event.getLocation(),
           startTime: event.getStartTime().toISOString(),
           endTime: event.getEndTime().toISOString(),
           attendees: event.getGuestList().map(guest => guest.getEmail()),
           isAllDay: event.isAllDayEvent()
         }
+
+        // Only include location if it's not empty
+        const location = event.getLocation();
+        if (location && location.trim() !== '') {
+          eventResult.location = location;
+        }
+
+        // Keep recurring event metadata
         if (event.isRecurringEvent()) {
           const fullEvent = FullCalendar.Events.get(calendarId, event.getId().split('@')[0]);
           eventResult.recurrence = fullEvent.recurrence[0];

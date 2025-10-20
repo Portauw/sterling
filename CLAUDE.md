@@ -21,7 +21,6 @@ clasp open    # Open project in Apps Script editor
 Test functions are available in `test.js` and executed via Apps Script editor:
 - `test()`: Runs task enrichment process (`processor.enrichTodoistTasks()`)
 - `calendar()`: Processes calendar events (`processor.processCalendarItems()`)
-- `runVectorServiceTest()`: Tests vector service (`processor.test()`)
 
 ## Key Architecture Points
 
@@ -44,12 +43,10 @@ Main execution starts in `Main.js` which initializes `Processor.js` with extensi
 2. Google Tasks → Todoist task conversion
 3. Tasks with "enrich" label → AI enhancement
 4. Calendar events → Preparation task creation
-5. Text processing → Vector embeddings
 
 ### Important Files
 - **Processor.js**: Central orchestrator at Processor.js:1
 - **AI.js**: Gemini client with retry logic at AI.js:9
-- **VectorService.js**: Text chunking and embedding at VectorService.js:10
 - **test.js**: Test configuration and functions at test.js:1
 
 ### Configuration Notes

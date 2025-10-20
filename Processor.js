@@ -4,7 +4,6 @@ const Processor = (function ({
   calendarId,
   geminiApiKey,
   geminiModel,
-  embeddingModel,
   label,
   todoistProjectId,
   driveFolders,
@@ -25,10 +24,10 @@ const Processor = (function ({
       AGENTS_PROMPTS
     });
   const CalendarClient = Calendar({ defaultCalendarId: calendarId })
-  const VectorServiceClient = VectorService({ geminiApiKey: geminiApiKey, embeddingModel: embeddingModel });
 
   const AI_RESULT_PREFIX = 'AI:';
   const ENRICHT_LABEL = 'enrich';
+  const ENRICH_SCHEDULED = 'enrich_scheduled';
 
   function log(message) {
     console.log(`Processor: ${message !== null ? JSON.stringify(message, null, 2) : 'null'}`);
@@ -162,19 +161,53 @@ const Processor = (function ({
     }
   }
 
+  function filterEventsForProcessing(events) {
+    log(`Filtering ${events.length} events for processing`);
+    const now = new Date();
+    const workHourStart = 7; // 7am
+    const workHourEnd = 20; // 8pm
+
+    const filtered = events.filter(event => {
+      // Skip all-day events
+      if (event.isAllDay) {
+        log(`Skipping all-day event: ${event.title}`);
+        return false;
+      }
+
+      // Check if event is within work hours
+      const eventStart = new Date(event.startTime);
+      const eventHour = eventStart.getHours();
+      if (eventHour < workHourStart || eventHour >= workHourEnd) {
+        log(`Skipping event outside work hours: ${event.title} at ${eventHour}:00`);
+        return false;
+      }
+
+      // Only process events with attendees (more than just the user)
+      if (!event.attendees || event.attendees.length <= 0) {
+        log(`Skipping event with no other attendees: ${event.title}`);
+        return false;
+      }
+
+      return true;
+    });
+
+    log(`Filtered to ${filtered.length} events for processing`);
+    return filtered;
+  }
+
   function prepareCalendarEventsContext(events) {
     log(`Preparing events with context`);
     const systemInstruction = AGENTS_PROMPTS;
 
     var contents = [
-      AiClient.buildTextContent('user', JSON.stringify(events)), 
+      AiClient.buildTextContent('user', JSON.stringify(events)),
       AiClient.buildTextContent('user', CALENDAR_INSTRUCTIONS_PROMPT)
     ];
     const files = [];
     // const tools = [AiClient.SEARCH_TOOL, AiClient.URL_TOOL];
-    const functions = DRIVE_FUNCTIONS;
-    // Not passing the tools along since both functions and tools are not supported.
-    var result = extractJsonFromResponse(AiClient.processCall(contents, systemInstruction, files, [], functions, 0)[0]);
+    // const functions = DRIVE_FUNCTIONS;
+    // Not passing the tools or functions along since not needed for this.
+    var result = extractJsonFromResponse(AiClient.processCall(contents, systemInstruction, files, [], [], 0)[0]);
     log(`Done preparing events.`);
     return result;
   }
@@ -218,38 +251,65 @@ const Processor = (function ({
       const returnValue = [];
       try {
         if (result.events.length > 0) {
-          log(`Processing ${result.events.length} calendar items`);
-          const eventsWithContext = prepareCalendarEventsContext(result.events);
-          // We sleep to give the AI some breathing room.
-          Utilities.sleep(10 * 1000);
-          for (const event of eventsWithContext.events) {
-            try {
-              log(`Processing event: ${event.title}, Data: ${JSON.stringify(event)}`);
-              if (event.preparation) {
-                var date = new Date();
-                try {
-                  date = new Date(event.startTime);
-                  date.setHours(date.getHours() - 2);
-                }catch (err){
-                  log(`Error during parsing date based on ${event.startTime}`);
+          log(`Retrieved ${result.events.length} calendar items`);
+          const filteredEvents = filterEventsForProcessing(result.events);
+
+          if (filteredEvents.length === 0) {
+            log(`No events to process after filtering`);
+            return returnValue;
+          }
+
+          // Process events in batches of 3-5 to reduce token usage per API call
+          const batchSize = 3;
+          const batches = [];
+          for (let i = 0; i < filteredEvents.length; i += batchSize) {
+            batches.push(filteredEvents.slice(i, i + batchSize));
+          }
+
+          log(`Processing ${filteredEvents.length} events in ${batches.length} batches of ${batchSize}`);
+
+          // Process each batch
+          for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+            const batch = batches[batchIndex];
+            log(`Processing batch ${batchIndex + 1}/${batches.length} with ${batch.length} events`);
+
+            const eventsWithContext = prepareCalendarEventsContext(batch);
+
+            // Sleep between batches to give AI breathing room
+            if (batchIndex < batches.length - 1) {
+              Utilities.sleep(10 * 1000);
+            }
+
+            // Process each event in the batch results
+            for (const event of eventsWithContext.events) {
+              try {
+                log(`Processing event: ${event.title}, Data: ${JSON.stringify(event)}`);
+                if (event.preparation) {
+                  var date = new Date();
+                  try {
+                    date = new Date(event.startTime);
+                    date.setHours(date.getHours() - 2);
+                  }catch (err){
+                    log(`Error during parsing date based on ${event.startTime}`);
+                  }
+                  const task = {
+                    title: `Prepare for ${event.title}`,
+                    description: event.meeting_preparation_prompt,
+                    labels: [ENRICH_SCHEDULED],
+                    due_date: date ? date.toISOString() : new Date().toISOString(),
+                    // The TODOIST ProjectID is linked to the Project the item must be created in.
+                    project_id: todoistProjectId
+                  }
+                  const todoistTask = createTodoistTasks([task]);
+                  returnValue.push(todoistTask);
+                  // Lets give some room to AI to process them all.
+                  Utilities.sleep(20 * 1000);
+                } else {
+                  log(`Not processing event ${event.title} since not needed.`);
                 }
-                const task = {
-                  title: `Prepare for ${event.title}`,
-                  description: event.meeting_preparation_prompt,
-                  labels: [ENRICHT_LABEL],
-                  due_date: date ? date.toISOString() : new Date().toISOString(),
-                  // The TODOIST ProjectID is linked to the Project the item must be created in.
-                  project_id: todoistProjectId
-                }
-                const todoistTask = createTodoistTasks([task]);
-                returnValue.push(todoistTask);
-                // Lets give some room to AI to process them all.
-                Utilities.sleep(20 * 1000);
-              } else {
-                log(`Not processing event ${event.title} since not needed.`);
+              } catch (err) {
+                log(`Error during processing event ${event.title}. Due to ${err}`);
               }
-            } catch (err) {
-              log(`Error during processing event ${event.title}. Due to ${err}`);
             }
           }
         } else {
@@ -289,21 +349,12 @@ const Processor = (function ({
     //log(grouping);
   }
 
-  function test(){
-    const sampleText = AGENTS_PROMPTS;
-    const result = VectorServiceClient.processAndStoreText(sampleText);
-    log(`Result: ${result}`);
-  }
-
-  
-
   return {
     processGoogleTasks,
     enrichTodoistTasks,
     processContextData,
     enrichTodaysTasksForLabel,
-    processCalendarItems,
-    test,
+    processCalendarItems
   }
 });
 
