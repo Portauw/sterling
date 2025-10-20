@@ -10,6 +10,10 @@ const Processor = (function ({
   promptInstructions
 }) {
 
+  function log(message) {
+    console.log(`Processor: ${message !== null ? JSON.stringify(message, null, 2) : 'null'}`);
+  }
+  log('Initialising processor');
   const TodoistClient = Todoist({ todoistApiKey: todoistApiKey, label: label });
   const GoogleTaskClient = GoogleTask({ gTaskListId: gTaskListId, minuteInterval: 35 });
   const VaultClient = Vault({});
@@ -28,10 +32,8 @@ const Processor = (function ({
   const AI_RESULT_PREFIX = 'AI:';
   const ENRICHT_LABEL = 'enrich';
   const ENRICH_SCHEDULED = 'enrich_scheduled';
-
-  function log(message) {
-    console.log(`Processor: ${message !== null ? JSON.stringify(message, null, 2) : 'null'}`);
-  }
+  log('Initialising processor completed');
+  
 
   function processContextData(forceUpdate = false) {
     var propertyNamesPropertyValue = [];

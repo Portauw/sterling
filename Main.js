@@ -9,7 +9,7 @@ function main({
   promptInstructions,
   driveFolders = []
 }) {
-  return Processor({
+  const processor = Processor({
     gTaskListId,
     calendarId,
     geminiApiKey,
@@ -20,4 +20,5 @@ function main({
     todoistProjectId,
     driveFolders
   });
+  return processor;
 }
