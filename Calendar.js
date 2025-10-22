@@ -151,9 +151,11 @@ const Calendar = (function ({ defaultCalendarId }) {
     log(`Getting calendarItems for ${calendarId}`);
     try {
       const calendar = CalendarApp.getCalendarById(calendarId);
+      
       if (!calendar) {
         return { success: false, error: `Calendar not found: ${calendarId}` };
       }
+      
       const events = calendar.getEventsForDay(date,
         {
           statusFilters: [
@@ -163,6 +165,7 @@ const Calendar = (function ({ defaultCalendarId }) {
             CalendarApp.GuestStatus.OWNER
           ]
         });
+        
       const limitedEvents = events.slice(0, maxResults);
 
       const formattedEvents = limitedEvents.map(event => {
@@ -183,8 +186,12 @@ const Calendar = (function ({ defaultCalendarId }) {
 
         // Keep recurring event metadata
         if (event.isRecurringEvent()) {
-          const fullEvent = FullCalendar.Events.get(calendarId, event.getId().split('@')[0]);
-          eventResult.recurrence = fullEvent.recurrence[0];
+          try {
+            const fullEvent = FullCalendar.Events.get(calendarId, event.getId().split('@')[0]);
+            eventResult.recurrence = fullEvent.recurrence[0];
+          } catch (err){
+            log(`Error during retrieval event recurrence for ${event.getTitle()}`)
+          }
         }
         return eventResult;
       });

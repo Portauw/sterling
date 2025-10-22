@@ -8,7 +8,7 @@ const AI = (function ({
   const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=multipart&key=${geminiApiKey}`
   const RETRY_CONFIG = {
     maxTryCount: 3,
-    intervalSeconds: 15
+    intervalSeconds: 30
   }
 
   const SEARCH_TOOL = 
@@ -34,6 +34,24 @@ const AI = (function ({
     const result = UrlFetchApp.fetch(url, params);
     log(result.getResponseCode() == 200 ? `Succesfully deleted ${fileId}` : `Error during deleting ${fileId} - ${result.getResponseCode()}`);
     return true;
+  }
+
+  /**
+   * Deletes all files with a matching displayName from Gemini.
+   * Returns the count of files deleted.
+   */
+  function deleteFileByDisplayName(displayName) {
+    const allFiles = getFiles();
+    const matchingFiles = allFiles.filter(file => file.displayName === displayName);
+
+    if (matchingFiles.length > 0) {
+      log(`Found ${matchingFiles.length} existing file(s) with displayName "${displayName}", deleting...`);
+      for (const file of matchingFiles) {
+        deleteFile(file.name);
+      }
+    }
+
+    return matchingFiles.length;
   }
 
   /**
@@ -179,6 +197,9 @@ const AI = (function ({
 
   function uploadFile(fileName, fileBlob) {
     try {
+      // Delete any existing files with the same displayName to prevent duplicates
+      deleteFileByDisplayName(fileName);
+
       const metadata = {
         file: {
           displayName: fileName
@@ -239,8 +260,8 @@ const AI = (function ({
       contents: contents,
       // ...(cacheId && {cachedContent: cacheId}),
       // tools:  [...tools, ...functions],
-      tools:  functions,
-      //tools:  tools,
+      // DISABLED TOOL CALLING SINCE NOT REALLY WORKING CORRECTLY
+      // tools:  functions,
       systemInstruction:
       {
         parts:
@@ -259,14 +280,52 @@ const AI = (function ({
     });
     try {
       var response = UrlFetchApp.fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`, params);
-      var result = JSON.parse(response.getContentText());
+      var responseCode = response.getResponseCode();
+      var result;
+
+      // Check for server errors before parsing JSON
+      if (responseCode >= 500) {
+        result = {
+          error: {
+            message: `Server error: ${responseCode}`,
+            status: 'SERVER_ERROR'
+          }
+        };
+      } else {
+        // Try to parse JSON, handle parse errors gracefully
+        try {
+          result = JSON.parse(response.getContentText());
+        } catch (parseErr) {
+          result = {
+            error: {
+              message: `Invalid JSON response: ${parseErr.message}`,
+              status: 'PARSE_ERROR'
+            }
+          };
+        }
+      }
+
+      // Log token usage metadata if available
+      if (result.usageMetadata) {
+        log({
+          message: "API Response Token Usage",
+          model: geminiModel,
+          tokenUsage: {
+            promptTokens: result.usageMetadata.promptTokenCount || 0,
+            candidatesTokens: result.usageMetadata.candidatesTokenCount || 0,
+            totalTokens: result.usageMetadata.totalTokenCount || 0,
+            cachedContentTokens: result.usageMetadata.cachedContentTokenCount || 0
+          }
+        });
+      }
+
       if (result.error) {
         const errorMessage = `${result.error.message} - ${result.error.status}`;
         if (tryCount >= RETRY_CONFIG.maxTryCount) {
           log(`Failed to retrieve data from ai ${errorMessage}`);
           return [errorMessage];
         } else {
-          log(`Error during processing, trying again in ${RETRY_CONFIG.intervalSeconds}seconds, error: ${errorMessage}`);
+          log(`Error during processing, trying again in ${RETRY_CONFIG.intervalSeconds} seconds, error: ${errorMessage}`);
           Utilities.sleep(RETRY_CONFIG.intervalSeconds * 1000);
           return processCall(contents, systemInstruction, files, tools, functions, tryCount++);
         }
@@ -274,7 +333,12 @@ const AI = (function ({
       const returnValue = result.candidates[0].content.parts.map((part) => part.text);
       if (!returnValue[0]){
         // check if it is a function call and take the first one.
-        const functionResults = result.candidates[0].content.parts.map((part) => part.functionCall);
+        var functionResults = result.candidates[0].content.parts.map((part) => part.functionCall);
+        log(`Function calls detected: ${JSON.stringify(functionResults)}`);
+        if (functionResults.length > 2){
+          log(`Too many function calls being triggered. ${functionResults.length} `);
+          functionResults = functionResults.slice(0, 2);
+        }
         for (const functionCall of functionResults){
           const functionName = functionCall.name;
           log(`Triggered function call ${functionName}`);
@@ -291,7 +355,7 @@ const AI = (function ({
       return returnValue;
     } catch (err) {
       log(`Failed to retrieve data from AI ${err.message}`);
-      return `Failed to retrieve data from AI ${err.message}`;
+      return [`Failed to retrieve data from AI ${err.message}`];
     }
   }
 
@@ -302,6 +366,7 @@ const AI = (function ({
     getFile,
     getFiles,
     deleteFile,
+    deleteFileByDisplayName,
     updateOrCreateCache,
     updateTtlCache,
     buildTextContent,

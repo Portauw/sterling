@@ -69,11 +69,14 @@ const Processor = (function ({
         TodoistClient.deleteComments(comments.map(c => c.id));
       }
       enrichTodoistTask(task);
-      Utilities.sleep(10 * 1000);
+      task.labels.splice(task.labels.indexOf(label), 1);
+      TodoistClient.updateTask(task);
+      Utilities.sleep(20 * 1000);
     }
   }
 
   function enrichTodoistTask(task, comments) {
+    log(`Enrichting task: ${JSON.stringify(task)}`)
     var content = [];
     content.push(AiClient.buildTextContent('user', `Given this task with title ${task.content} and optional description ${task.description}`));
     if (comments?.length > 0) {
@@ -85,7 +88,6 @@ const Processor = (function ({
     const systemInstruction = AGENTS_PROMPTS;
     const files = AiClient.getFiles();
     //const tools = [AiClient.SEARCH_TOOL, AiClient.URL_TOOL];
-
     var aiResult = AiClient.processCall(content, systemInstruction, files, [], DRIVE_FUNCTIONS, 0);
     aiResult.forEach((item) => {
       TodoistClient.createComment(task.id, `${AI_RESULT_PREFIX} ${item}`);
@@ -205,7 +207,7 @@ const Processor = (function ({
       AiClient.buildTextContent('user', JSON.stringify(events)),
       AiClient.buildTextContent('user', CALENDAR_INSTRUCTIONS_PROMPT)
     ];
-    const files = [];
+    const files = AiClient.getFiles();
     // const tools = [AiClient.SEARCH_TOOL, AiClient.URL_TOOL];
     // const functions = DRIVE_FUNCTIONS;
     // Not passing the tools or functions along since not needed for this.
@@ -326,10 +328,10 @@ const Processor = (function ({
     }
   }
 
-  function aiFilesListing() {
+  function aiFileManagement() {
     const grouping ={};
     const aifiles = AiClient.getFiles();
-    //AiClient.deleteFile('files/m6aal2coocv4');
+    log(`Amount of files: ${aifiles.length}`);
     for (const file of aifiles){
       log(`${file.name} - ${file.displayName}`);
       if (!grouping[file.displayName]){
@@ -338,15 +340,15 @@ const Processor = (function ({
         grouping[file.displayName] = [...grouping[file.displayName], file];
       }
     }
-    // for (const [key, value] of Object.entries(grouping)) {
-    //   if (value.length > 1){
-    //     log(`size: ${value.length} - ${value.slice(1)}`)
-    //     const sliced = value.slice(1);
-    //     for (const f of sliced){
-    //       //log(AiClient.deleteFile(f.name));
-    //     }
-    //   }
-    // }
+    for (const [key, value] of Object.entries(grouping)) {
+      if (value.length > 1){
+        log(`size: ${value.length} - ${JSON.stringify(value.slice(1))}`)
+        const sliced = value.slice(1);
+        for (const f of sliced){
+          log(AiClient.deleteFile(f.name));
+        }
+      }
+    }
 
     //log(grouping);
   }
@@ -356,7 +358,8 @@ const Processor = (function ({
     enrichTodoistTasks,
     processContextData,
     enrichTodaysTasksForLabel,
-    processCalendarItems
+    processCalendarItems,
+    aiFileManagement
   }
 });
 
