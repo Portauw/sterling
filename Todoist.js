@@ -31,7 +31,7 @@ const Todoist = (function ({ todoistApiKey, label }) {
     var url = 'https://api.todoist.com/rest/v2/tasks'
     try {
       var link = task.link
-      var description = link ? '[' + link.description + '](' + link.url + ')' + task.description : '' + task.description;
+      var description = link ? '[' + link.description + '](' + link.url + ')' + (task.description || '') : (task.description || '');
       params.payload = JSON.stringify({
         content: task.title,
         description: description,
@@ -65,7 +65,7 @@ const Todoist = (function ({ todoistApiKey, label }) {
       var result = UrlFetchApp.fetch(buildUrl_(url, queryParams), params);
       return JSON.parse(result);
     } catch (err) {
-      log(`Failed to get task ${taskId} with error ${err.message}`);
+      log(`Failed to get tasks with filter "${filter}" with error ${err.message}`);
       return false;
     }
   }

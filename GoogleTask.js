@@ -21,7 +21,7 @@ const GoogleTask = (function ({ gTaskListId, minuteInterval }) {
       }
       for (const task of tasks) {
         log(`${task.title} (${task.id} ${task.due}) ${task.notes}`);
-        var link = task.getLinks().length !== 0 ? task.getLinks()[0] : null;
+        var link = task.links && task.links.length !== 0 ? task.links[0] : null;
         var type = link !== null ? link.type.toUpperCase() : 'ASSISTANT'
         task.type = type;
         task.description = task.notes;

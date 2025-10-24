@@ -153,13 +153,13 @@ const Processor = (function ({
         tasksResult.push(todoisTask);
       }
       return {
-        succes: true,
+        success: true,
         result: tasks
       };
     } catch (err) {
       log(`Failed with error ${err.message}`);
       return {
-        succes: false,
+        success: false,
         error: err.message
       };
     }

@@ -236,15 +236,15 @@ const Calendar = (function ({ defaultCalendarId }) {
   /**
    * Create a new calendar event
    */
-  function createEvent(calendarId = this.defaultCalendarId, title, startDateTime, endDateTime, description = '', location = '', attendees = []) {
+  function createEvent(calendarId = defaultCalendarId, title, startDateTime, endDateTime, description = '', location = '', attendees = []) {
     try {
       const calendar = CalendarApp.getCalendarById(calendarId);
       if (!calendar) {
         return { success: false, error: `Calendar not found: ${calendarId}` };
       }
 
-      const startTime = this._parseDateTime(startDateTime);
-      const endTime = this._parseDateTime(endDateTime);
+      const startTime = _parseDateTime(startDateTime);
+      const endTime = _parseDateTime(endDateTime);
 
       if (!startTime || !endTime) {
         return { success: false, error: 'Invalid date/time format' };
@@ -281,7 +281,7 @@ const Calendar = (function ({ defaultCalendarId }) {
   /**
    * Update an existing calendar event
    */
-  function updateEvent(calendarId = this.defaultCalendarId, eventId, updates) {
+  function updateEvent(calendarId = defaultCalendarId, eventId, updates) {
     try {
       const calendar = CalendarApp.getCalendarById(calendarId);
       if (!calendar) {
@@ -313,8 +313,8 @@ const Calendar = (function ({ defaultCalendarId }) {
         const currentStart = event.getStartTime();
         const currentEnd = event.getEndTime();
 
-        const newStart = updates.startDateTime ? this._parseDateTime(updates.startDateTime) : currentStart;
-        const newEnd = updates.endDateTime ? this._parseDateTime(updates.endDateTime) : currentEnd;
+        const newStart = updates.startDateTime ? _parseDateTime(updates.startDateTime) : currentStart;
+        const newEnd = updates.endDateTime ? _parseDateTime(updates.endDateTime) : currentEnd;
 
         if (!newStart || !newEnd) {
           return { success: false, error: 'Invalid date/time format in updates' };
@@ -355,7 +355,7 @@ const Calendar = (function ({ defaultCalendarId }) {
   /**
    * Delete a calendar event
    */
-  function deleteEvent(calendarId = this.defaultCalendarId, eventId) {
+  function deleteEvent(calendarId = defaultCalendarId, eventId) {
     try {
       const calendar = CalendarApp.getCalendarById(calendarId);
       if (!calendar) {
@@ -383,7 +383,7 @@ const Calendar = (function ({ defaultCalendarId }) {
   /**
    * Search for events by text query
    */
-  function findEvents(query, calendarId = this.defaultCalendarId, maxResults = 20) {
+  function findEvents(query, calendarId = defaultCalendarId, maxResults = 20) {
     try {
       const calendar = CalendarApp.getCalendarById(calendarId);
       if (!calendar) {

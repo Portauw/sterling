@@ -2,6 +2,8 @@
 
 ## Project Overview
 
+Read @ai-assistant/AI_INSTRUCTIONS.md
+
 This Google Apps Script project acts as a personal AI assistant integrating Google Tasks, Google Calendar, and Todoist with Gemini AI. The system automates task creation, enriches tasks with AI-generated content, and helps prepare for calendar events.
 
 **Core Functionality:**

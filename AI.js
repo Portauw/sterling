@@ -76,7 +76,7 @@ const AI = (function ({
     const res = JSON.parse(UrlFetchApp.fetch(url, params).getContentText());
     var files = res.files;
     if (res.nextPageToken) {
-      files = files.concat(this.getFiles(res.nextPageToken));
+      files = files.concat(getFiles(res.nextPageToken));
     }
     return files;
   }
@@ -170,7 +170,7 @@ const AI = (function ({
       var url = `https://generativelanguage.googleapis.com/v1beta/${cache.name}?key=${geminiApiKey}`;
       var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true, contentType: 'application/json', method: 'GET' });
       if (response.getResponseCode() == 200) {
-        return JSON.parse(response);
+        return JSON.parse(response.getContentText());
       } else {
         log(`Cache ${cacheDisplayName} not found in Gemini.`);
         return null;
@@ -327,7 +327,7 @@ const AI = (function ({
         } else {
           log(`Error during processing, trying again in ${RETRY_CONFIG.intervalSeconds} seconds, error: ${errorMessage}`);
           Utilities.sleep(RETRY_CONFIG.intervalSeconds * 1000);
-          return processCall(contents, systemInstruction, files, tools, functions, tryCount++);
+          return processCall(contents, systemInstruction, files, tools, functions, tryCount + 1);
         }
       }
       const returnValue = result.candidates[0].content.parts.map((part) => part.text);

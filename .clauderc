@@ -1,0 +1,12 @@
+{
+  "allowedCommands": [
+    {
+      "command": "clasp",
+      "args": ["push"]
+    },
+    {
+      "command": "git",
+      "args": ["push"]
+    }
+  ]
+}
