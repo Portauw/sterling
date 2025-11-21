@@ -1,4 +1,4 @@
-const Calendar = (function ({ defaultCalendarId }) {
+const Calendar = (function ({ defaultCalendarId, workDayStartHour = 8, workDayEndHour = 18 }) {
   function log(message) {
     console.log(`Calendar: ${message ? JSON.stringify(message, null, 2) : 'null'}`);
   }
@@ -467,10 +467,96 @@ const Calendar = (function ({ defaultCalendarId }) {
       return null;
     }
   }
+
+  /**
+   * Find the first available time slot of a given duration before a specific deadline
+   * @param {Array} events - List of existing events for the day
+   * @param {Date} deadline - The time by which the task must be completed (e.g., the meeting start time)
+   * @param {number} durationMinutes - Required duration in minutes
+   * @return {Date|null} - Start time of the found slot, or null if none found
+   */
+  function findOpenSlot(events, deadline, durationMinutes = 45) {
+    try {
+      if (!deadline) {
+        return null;
+      }
+
+      let rangeStart = new Date(deadline);
+      rangeStart.setHours(workDayStartHour, 0, 0, 0);
+
+      let rangeEnd = new Date(deadline);
+
+      if (rangeEnd <= rangeStart) {
+        // If the deadline is before the work start time, we can't schedule it today in work hours.
+        return null;
+      }
+
+      // Filter events that might overlap or impact the range [rangeStart, rangeEnd]
+      // and parse their times.
+      const relevantEvents = events
+        .map(e => ({
+          title: e.title,
+          start: new Date(e.startTime),
+          end: new Date(e.endTime)
+        }))
+        .filter(e => {
+          // We are interested in events that end after our range starts
+          // and start before our range ends.
+          return e.start < rangeEnd && e.end > rangeStart;
+        })
+        .sort((a, b) => a.start - b.start);
+      
+      let currentPointer = rangeStart;
+
+      for (const event of relevantEvents) {
+        
+        // If the current pointer is already past the deadline, we can stop (shouldn't happen if logic is correct)
+        if (currentPointer >= rangeEnd) {
+          break;
+        }
+
+        // Calculate gap between current pointer and event start
+        // Ensure we don't look at gaps before currentPointer (event.start could be before rangeStart if it overlaps)
+        const effectiveEventStart = event.start < currentPointer ? currentPointer : event.start;
+        
+        if (effectiveEventStart > currentPointer) {
+            const gapMilliseconds = effectiveEventStart.getTime() - currentPointer.getTime();
+            const gapMinutes = gapMilliseconds / (1000 * 60);
+            
+            if (gapMinutes >= durationMinutes) {
+                return currentPointer;
+            }
+        }
+
+        // Move pointer to the end of this event, but only if it pushes us forward
+        if (event.end > currentPointer) {
+          currentPointer = event.end;
+        }
+      }
+
+      // Check for a final gap between the last event (or start of day) and the deadline
+      if (currentPointer < rangeEnd) {
+        const finalGapMilliseconds = rangeEnd.getTime() - currentPointer.getTime();
+        const finalGapMinutes = finalGapMilliseconds / (1000 * 60);
+        
+        if (finalGapMinutes >= durationMinutes) {
+          return currentPointer;
+        }
+      }
+      
+      return null;
+
+    } catch (err) {
+      log(`Error in findOpenSlot: ${err}`);
+      return null;
+    }
+  }
+
   return {
     getToolConfigs,
     //getCalendars,
     getEventsForDate,
+    findOpenSlot
     //createEvent,
     //updateEvent,
     //deleteEvent,

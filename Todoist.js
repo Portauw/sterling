@@ -32,12 +32,17 @@ const Todoist = (function ({ todoistApiKey, label }) {
     try {
       var link = task.link
       var description = link ? '[' + link.description + '](' + link.url + ')' + (task.description || '') : (task.description || '');
+      
+      // Destructure to separate special handling fields from the rest
+      const { title, link: _, description: __, labels = [], due_date, project_id, ...otherProps } = task;
+
       params.payload = JSON.stringify({
-        content: task.title,
+        ...otherProps, // Spread remaining properties (e.g. duration, priority)
+        content: title,
         description: description,
-        labels: [...task.labels, label],
-        ...(task.due_date && {due_date: task.due_date}),
-        project_id: task.project_id
+        labels: [...labels, label],
+        ...(due_date && {due_date: due_date}),
+        project_id: project_id
       });
 
       var result = JSON.parse(UrlFetchApp.fetch(url, params));

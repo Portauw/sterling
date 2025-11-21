@@ -232,11 +232,13 @@
 2. **AI Analysis** (`Processor.js:202-217`)
    - Batch events (3 per batch) to reduce API calls
    - Send events + calendar instructions to Gemini
-   - AI determines which events need preparation tasks
+   - AI determines which events need preparation tasks and estimates duration
 
 3. **Create prep tasks** (`Processor.js:288-317`)
-   - For events needing prep, create Todoist task
-   - Due time: 2 hours before event start
+   - For events needing prep, find open slot in calendar
+   - Duration: AI-estimated `duration_estimation` or default 45 mins
+   - Slot search: Within work hours (7am-8pm) before the meeting
+   - Fallback: If no slot found, schedule 2 hours before event start
    - Add "enrich_scheduled" label
    - Include AI-generated preparation prompt
 
@@ -245,7 +247,7 @@
    - Tasks will be enriched later when processed
 
 **Data transformations:**
-- Calendar Events → Filtered Events → AI Analysis → Preparation Tasks → Todoist
+- Calendar Events → Filtered Events → AI Analysis (with Duration) → Scheduled Task → Todoist
 
 ---
 

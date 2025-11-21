@@ -287,7 +287,7 @@ const AI = (function ({
       if (responseCode >= 500) {
         result = {
           error: {
-            message: `Server error: ${responseCode}`,
+            message: `Server error: ${responseCode}, ${JSON.stringify(response.getContentText('UTF-8'))}`,
             status: 'SERVER_ERROR'
           }
         };
@@ -330,7 +330,12 @@ const AI = (function ({
           return processCall(contents, systemInstruction, files, tools, functions, tryCount + 1);
         }
       }
-      const returnValue = result.candidates[0].content.parts.map((part) => part.text);
+      var returnValue = '';
+      try {
+        returnValue = result.candidates[0].content.parts.map((part) => part.text);
+      }catch(err){
+        log(`Error reading result ${JSON.stringify(result)}`);
+      }
       if (!returnValue[0]){
         // check if it is a function call and take the first one.
         var functionResults = result.candidates[0].content.parts.map((part) => part.functionCall);

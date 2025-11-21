@@ -379,11 +379,19 @@ sequenceDiagram
 
                 loop For each enriched event in batch
                     alt event.preparation == true
-                        Processor->>Processor: Calculate due_date
-                        Note over Processor: due_date = event.startTime - 2 hours
+                        Processor->>Calendar: findOpenSlot(events, start, duration)
+                        activate Calendar
+                        Calendar-->>Processor: openSlot or null
+                        deactivate Calendar
+
+                        alt Slot Found
+                            Note over Processor: due_date = openSlot
+                        else No Slot
+                            Note over Processor: due_date = event.startTime - 2 hours
+                        end
 
                         Processor->>Processor: Build prep task
-                        Note over Processor: Title: "Prepare for {event.title}"<br/>Description: event.meeting_preparation_prompt<br/>Labels: ['enrich']<br/>Project: configured todoistProjectId
+                        Note over Processor: Title: "Prepare for {event.title}"<br/>Description: event.meeting_preparation_prompt<br/>Labels: ['enrich_scheduled']<br/>Project: configured todoistProjectId
 
                         Processor->>Processor: createTodoistTasks([task])
                         activate Processor
@@ -434,11 +442,13 @@ sequenceDiagram
 - **AI Analysis**:
   - Determines which events need preparation
   - Generates meeting_preparation_prompt for each event
+  - Estimates preparation duration (`duration_estimation`) or defaults to 45 mins
   - Uses calendar-specific instructions from Drive
   - Processes 3 events per AI call (batch size)
 - **Preparation Tasks**:
-  - Created 2 hours before event start time
-  - Automatically labeled with 'enrich' for AI processing
+  - Smart Scheduling: Finds an open time slot within work hours (7am-8pm) before the meeting
+  - Fallback: Schedules 2 hours before event start if no open slot is found
+  - Automatically labeled with 'enrich_scheduled' for later processing
   - Contains AI-generated preparation guidance
 - **Rate Limiting**:
   - 10 seconds between batch AI calls

@@ -10,7 +10,7 @@ This Google Apps Script project acts as a personal AI assistant integrating Goog
 
 *   **Google Tasks to Todoist:** Automatically converts Google Tasks into Todoist tasks
 *   **AI-Powered Task Enrichment:** Uses Gemini to add context and information to Todoist tasks labeled with "enrich"
-*   **Calendar Event Preparation:** Analyzes Google Calendar events and creates preparatory tasks in Todoist 2 hours before events
+*   **Calendar Event Preparation:** Analyzes Google Calendar events and creates preparatory tasks in Todoist, scheduled in open slots before the event (or 2 hours prior as fallback)
 *   **File-based Context:** Leverages files from Google Drive to provide context to the AI
 
 ## Key Components
@@ -74,5 +74,5 @@ const ModuleName = (function ({ config }) {
 ### Key Implementation Details
 *   Properties Service used for caching and sync token management
 *   File expiration tracking prevents unnecessary AI uploads
-*   Calendar preparation tasks created 2 hours before event start time
+*   Calendar preparation tasks scheduled in open slots based on AI-estimated duration (default 45 mins), falling back to 2 hours before event if no slot is found
 *   Drive files provide persistent context for AI operations

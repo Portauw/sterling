@@ -7,7 +7,9 @@ function main({
   label,
   todoistProjectId,
   promptInstructions,
-  driveFolders = []
+  driveFolders = [],
+  workDayStartHour = 9,
+  workDayEndHour = 17
 }) {
   const processor = Processor({
     gTaskListId,
@@ -18,7 +20,9 @@ function main({
     todoistApiKey,
     label,
     todoistProjectId,
-    driveFolders
+    driveFolders,
+    workDayStartHour,
+    workDayEndHour
   });
   return processor;
 }
