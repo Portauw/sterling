@@ -227,27 +227,27 @@
 **Flow:**
 1. **Retrieve events** (`Processor.js:251-329`)
    - Get today's calendar events
-   - Filter: work hours only (7am-8pm), has attendees, not all-day
+   - Filter: has attendees, not all-day (work hours filtering removed)
 
 2. **AI Analysis** (`Processor.js:202-217`)
-   - Batch events (3 per batch) to reduce API calls
-   - Send events + calendar instructions to Gemini
+   - Send filtered events + calendar instructions to Gemini
    - AI determines which events need preparation tasks and estimates duration
 
 3. **Create prep tasks** (`Processor.js:288-317`)
-   - For events needing prep, find open slot in calendar
-   - Duration: AI-estimated `duration_estimation` or default 45 mins
-   - Slot search: Within work hours (7am-8pm) before the meeting
-   - Fallback: If no slot found, schedule 2 hours before event start
+   - For events needing prep, find open slot in calendar using 3-tier strategy:
+     1. **Strict**: Try to find slot avoiding *all* events (including placeholders).
+     2. **Lenient**: If strict fails, try avoiding *only* filtered (processed) events.
+     3. **Fallback**: If both fail, schedule 2 hours before event start.
+   - Duration: AI-estimated `duration` or default 45 mins
    - Add "enrich_scheduled" label
    - Include AI-generated preparation prompt
 
 4. **Result** (`Processor.js:307`)
-   - Todoist tasks created for meeting preparation
+   - Todoist tasks created for meeting preparation with calculated duration
    - Tasks will be enriched later when processed
 
 **Data transformations:**
-- Calendar Events → Filtered Events → AI Analysis (with Duration) → Scheduled Task → Todoist
+- Calendar Events → Filtered Events → AI Analysis (with Duration) → Scheduled Task (Strict/Lenient/Fallback) → Todoist
 
 ---
 

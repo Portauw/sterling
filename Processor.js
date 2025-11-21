@@ -171,7 +171,6 @@ const Processor = (function ({
 
   function filterEventsForProcessing(events) {
     log(`Filtering ${events.length} events for processing`);
-    const now = new Date();
 
     const filtered = events.filter(event => {
       // Skip all-day events
@@ -275,84 +274,8 @@ const Processor = (function ({
 
           // 2. Scheduling Phase: Plan tasks to avoid overlaps
           if (tasksToSchedule.length > 0) {
-             log(`Identified ${tasksToSchedule.length} tasks to schedule. Starting planning phase.`);
-             
-             // Sort tasks by event start time to schedule earlier meetings first
-             tasksToSchedule.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
-
-             // Track newly scheduled slots to include in both strict and lenient checks
-             const newlyScheduledSlots = [];
-
-             for (const event of tasksToSchedule) {
-                try {
-                    log(`Scheduling preparation for: ${event.title}`);
-                    var date = new Date();
-                    const eventStart = new Date(event.startTime);
-                    // Use AI estimated duration or default to 45
-                    log(`Estimated duration: ${event.duration_estimation}`);
-                    const duration = event.duration_estimation || 45;
-                    
-                    // Strategy 1: Strict - Avoid ALL events (filtered + skipped/placeholders)
-                    const allEventsBusyList = [...result.events, ...newlyScheduledSlots].map(e => ({
-                        startTime: e.startTime,
-                        endTime: e.endTime,
-                        title: e.title
-                    }));
-
-                    let scheduledTime = CalendarClient.findOpenSlot(allEventsBusyList, eventStart, duration);
-                    let schedulingStrategy = "Strict (Clean slot)";
-
-                    // Strategy 2: Lenient - Avoid ONLY processed events (allow overlap with skipped/placeholders)
-                    if (!scheduledTime) {
-                        log(`No strict slot found for ${event.title}. Trying lenient strategy (overlapping skipped events).`);
-                        const lenientBusyList = [...filteredEvents, ...newlyScheduledSlots].map(e => ({
-                            startTime: e.startTime,
-                            endTime: e.endTime,
-                            title: e.title
-                        }));
-                        
-                        scheduledTime = CalendarClient.findOpenSlot(lenientBusyList, eventStart, duration);
-                        schedulingStrategy = "Lenient (Overlapping skipped events)";
-                    }
-
-                    if (scheduledTime) {
-                      date = scheduledTime;
-                      const endTime = new Date(date.getTime() + duration * 60000);
-                      log(`Scheduled (${schedulingStrategy}) preparation for ${event.title} at ${date.toISOString()} - ${endTime.toISOString()} (${duration} mins)`);
-                      
-                      // Add this new slot to our tracker
-                      newlyScheduledSlots.push({
-                          startTime: date.toISOString(),
-                          endTime: endTime.toISOString(),
-                          title: `Reserved: Prep for ${event.title}`
-                      });
-                    } else {
-                      // Strategy 3: Fallback
-                      date = new Date(eventStart);
-                      date.setHours(date.getHours() - 2);
-                      log(`No open slot found (Strict or Lenient). Scheduled preparation for ${event.title} at fallback time: ${date.toISOString()}`);
-                    }
-
-                    const task = {
-                        title: `Prepare for ${event.title}`,
-                        description: event.meeting_preparation_prompt,
-                        labels: [ENRICH_SCHEDULED],
-                        due_date: date ? date.toISOString() : new Date().toISOString(),
-                        project_id: todoistProjectId,
-                        duration: duration,
-                        duration_unit: 'minute'
-                    }
-
-                    const todoistTask = createTodoistTasks([task]);
-                    returnValue.push(todoistTask);
-                    
-                    // Rate limiting for task creation
-                    Utilities.sleep(2 * 1000);
-
-                } catch (err) {
-                    log(`Error during scheduling event ${event.title}. Due to ${err}`);
-                }
-             }
+             const scheduledTasks = schedulePreparationTasks(tasksToSchedule, result.events, filteredEvents);
+             returnValue.push(...scheduledTasks);
           } else {
              log("No preparation tasks identified.");
           }
@@ -367,6 +290,89 @@ const Processor = (function ({
     } else {
       log(`Error occured during retrieval of calendarEvents ${result.error}`);
     }
+  }
+
+  function schedulePreparationTasks(tasksToSchedule, allEvents, filteredEvents) {
+    log(`Identified ${tasksToSchedule.length} tasks to schedule. Starting planning phase.`);
+    const scheduledTasks = [];
+    
+    // Sort tasks by event start time to schedule earlier meetings first
+    tasksToSchedule.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+
+    // Track newly scheduled slots to include in both strict and lenient checks
+    const newlyScheduledSlots = [];
+
+    for (const event of tasksToSchedule) {
+      try {
+          log(`Scheduling preparation for: ${event.title}`);
+          var date = new Date();
+          const eventStart = new Date(event.startTime);
+          // Use AI estimated duration or default to 45
+          log(`Estimated duration: ${event.duration_estimation}`);
+          const duration = event.duration_estimation || 45;
+          
+          // Strategy 1: Strict - Avoid ALL events (filtered + skipped/placeholders)
+          const allEventsBusyList = [...allEvents, ...newlyScheduledSlots].map(e => ({
+              startTime: e.startTime,
+              endTime: e.endTime,
+              title: e.title
+          }));
+
+          let scheduledTime = CalendarClient.findOpenSlot(allEventsBusyList, eventStart, duration);
+          let schedulingStrategy = "Strict (Clean slot)";
+
+          // Strategy 2: Lenient - Avoid ONLY processed events (allow overlap with skipped/placeholders)
+          if (!scheduledTime) {
+              log(`No strict slot found for ${event.title}. Trying lenient strategy (overlapping skipped events).`);
+              const lenientBusyList = [...filteredEvents, ...newlyScheduledSlots].map(e => ({
+                  startTime: e.startTime,
+                  endTime: e.endTime,
+                  title: e.title
+              }));
+              
+              scheduledTime = CalendarClient.findOpenSlot(lenientBusyList, eventStart, duration);
+              schedulingStrategy = "Lenient (Overlapping skipped events)";
+          }
+
+          if (scheduledTime) {
+            date = scheduledTime;
+            const endTime = new Date(date.getTime() + duration * 60000);
+            log(`Scheduled (${schedulingStrategy}) preparation for ${event.title} at ${date.toISOString()} - ${endTime.toISOString()} (${duration} mins)`);
+            
+            // Add this new slot to our tracker
+            newlyScheduledSlots.push({
+                startTime: date.toISOString(),
+                endTime: endTime.toISOString(),
+                title: `Reserved: Prep for ${event.title}`
+            });
+          } else {
+            // Strategy 3: Fallback
+            date = new Date(eventStart);
+            date.setHours(date.getHours() - 2);
+            log(`No open slot found (Strict or Lenient). Scheduled preparation for ${event.title} at fallback time: ${date.toISOString()}`);
+          }
+
+          const task = {
+              title: `Prepare for ${event.title}`,
+              description: event.meeting_preparation_prompt,
+              labels: [ENRICH_SCHEDULED],
+              due_date: date ? date.toISOString() : new Date().toISOString(),
+              project_id: todoistProjectId,
+              duration: duration,
+              duration_unit: 'minute'
+          }
+
+          const todoistTask = createTodoistTasks([task]);
+          scheduledTasks.push(todoistTask);
+          
+          // Rate limiting for task creation
+          Utilities.sleep(2 * 1000);
+
+      } catch (err) {
+          log(`Error during scheduling event ${event.title}. Due to ${err}`);
+      }
+    }
+    return scheduledTasks;
   }
 
   function aiFileManagement() {

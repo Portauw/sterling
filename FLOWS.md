@@ -446,8 +446,11 @@ sequenceDiagram
   - Uses calendar-specific instructions from Drive
   - Processes 3 events per AI call (batch size)
 - **Preparation Tasks**:
-  - Smart Scheduling: Finds an open time slot within work hours (7am-8pm) before the meeting
-  - Fallback: Schedules 2 hours before event start if no open slot is found
+  - **3-Tier Scheduling Strategy**:
+    1. **Strict**: Attempts to find a slot avoiding *all* calendar events (both processed/filtered and others).
+    2. **Lenient**: If strict fails, attempts to find a slot avoiding *only* processed/filtered events (allowing overlap with placeholders/personal items).
+    3. **Fallback**: If both fail, schedules 2 hours before event start.
+  - Maintains a `newlyScheduledSlots` list to ensure tasks in the same run don't overlap each other.
   - Automatically labeled with 'enrich_scheduled' for later processing
   - Contains AI-generated preparation guidance
 - **Rate Limiting**:
