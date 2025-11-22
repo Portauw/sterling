@@ -16,7 +16,7 @@ This file stores your personal learning preferences for AI-assisted coding sessi
 
 ### Experience Level
 <!-- Choose ONE: entry-level, early-career, mid-level, senior -->
-**Current Level:** early-career
+**Current Level:** senior
 
 **Description:**
 - **entry-level**: New to professional software development (0-1 years)
@@ -28,7 +28,7 @@ This file stores your personal learning preferences for AI-assisted coding sessi
 
 ### Tech Stack Familiarity
 <!-- Choose ONE: new, familiar, experienced, expert -->
-**Familiarity with this codebase's tech stack:** familiar
+**Familiarity with this codebase's tech stack:** experienced
 
 **Description:**
 - **new**: First time using these technologies
@@ -40,7 +40,7 @@ This file stores your personal learning preferences for AI-assisted coding sessi
 
 ### Learning Goals
 <!-- Choose ONE or MULTIPLE that apply -->
-**Primary Goals:** productivity
+**Primary Goals:** mastery
 
 **Options:**
 - **architecture**: Understanding system design and how components fit together
@@ -124,8 +124,8 @@ This file stores your personal learning preferences for AI-assisted coding sessi
 
 Add any additional context about your learning preferences, specific areas you want to focus on, or topics you're already comfortable with:
 
-Focus on getting productive quickly with Google Apps Script patterns and understanding how the different services (AI, Todoist, Calendar, etc.) work together.
+Focus on getting better at JavaScript and deep mastery of the codebase patterns.
 
 ---
 
-*Last updated: 2025-10-24*
+*Last updated: 2025-11-22*

@@ -1,7 +1,6 @@
 const GoogleTask = (function ({ gTaskListId, minuteInterval }) {
-  function log(message){
-    console.log(`GoogleTask: ${message ? JSON.stringify(message, null,2) : 'null'}`);
-  }
+  
+  const logger = Telemetry.getLogger('GoogleTask');
 
   function listTaskLists() {
     let date = new Date();
@@ -16,11 +15,11 @@ const GoogleTask = (function ({ gTaskListId, minuteInterval }) {
       const response = Tasks.Tasks.list(gTaskListId, tasksOptionalArgs);
       const tasks = response.items;
       if (!tasks || tasks.length === 0) {
-        log('No tasks found in list.');
+        logger.info('No tasks found in list.');
         return [];
       }
       for (const task of tasks) {
-        log(`${task.title} (${task.id} ${task.due}) ${task.notes}`);
+        logger.info(`${task.title} (${task.id} ${task.due}) ${task.notes}`);
         var link = task.links && task.links.length !== 0 ? task.links[0] : null;
         var type = link !== null ? link.type.toUpperCase() : 'ASSISTANT'
         task.type = type;
@@ -35,7 +34,7 @@ const GoogleTask = (function ({ gTaskListId, minuteInterval }) {
       }
       return tasks;
     } catch (err) {
-      log('Failed with error %s', err.message);
+      logger.error(`Failed with error ${err.message}`);
       return false;
     }
   }
@@ -44,7 +43,7 @@ const GoogleTask = (function ({ gTaskListId, minuteInterval }) {
     for (const task of tasks) {
       var result = markTaskAsCompleted_(task);
       if (!result) {
-        log('Error during marking task %s', task.title);
+        logger.warn(`Error during marking task ${task.title}`);
       }
     }
   }
@@ -55,7 +54,7 @@ const GoogleTask = (function ({ gTaskListId, minuteInterval }) {
       var result = Tasks.Tasks.patch(task, gTaskListId, task.id);
       return true;
     } catch (err) {
-      log('Failed with error %s', err.message);
+      logger.error(`Failed with error ${err.message}`);
       return false;
     }
   }

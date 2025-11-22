@@ -1,8 +1,6 @@
 const Vault = (function ({ }) {
 
-  function log(message) {
-    console.log(`Google Drive: ${message !== null ? JSON.stringify(message, null, 2) : 'null'}`);
-  }
+  const logger = Telemetry.getLogger('Vault');
 
   function getFiles(folderId) {
     var filesResult = [];
@@ -15,7 +13,7 @@ const Vault = (function ({ }) {
   }
 
   function getFile(fileId) {
-    log(`Getting drive file by id: ${fileId} `)
+    logger.info(`Getting drive file by id: ${fileId} `)
     try {
       const file = DriveApp.getFileById(fileId);
       // Assumes the file is a text-based format.
@@ -34,7 +32,7 @@ const Vault = (function ({ }) {
   }
 
   function searchDrive(query) {
-    log(`Searching in drive for ${query} `)
+    logger.info(`Searching in drive for ${query} `)
     const files = DriveApp.searchFiles(`title contains "${query}" or fullText contains "${query}"`);
     let fileList = [];
     let count = 0;

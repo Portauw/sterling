@@ -1,5 +1,7 @@
 const Todoist = (function ({ todoistApiKey, label }) {
 
+  const logger = Telemetry.getLogger('Todoist');
+
   const SYNC_TOKEN = 'TODOIST_LAST_SYNC_TOKEN';
 
   /**
@@ -16,12 +18,8 @@ const Todoist = (function ({ todoistApiKey, label }) {
     return url + (url.indexOf('?') >= 0 ? '&' : '?') + paramString;
   }
 
-  function log(message) {
-    console.log(`Todoist: ${message ? JSON.stringify(message, null, 2) : 'null'}`);
-  }
-
   function createTask(task) {
-    log(`Creating task ${JSON.stringify(task)}`);
+    logger.info(`Creating task ${JSON.stringify(task)}`);
     var params = {
       method: "POST",
       contentType: 'application/json',
@@ -46,10 +44,10 @@ const Todoist = (function ({ todoistApiKey, label }) {
       });
 
       var result = JSON.parse(UrlFetchApp.fetch(url, params));
-      log(`Task created ${result.id} - ${result.content}`);
+      logger.info(`Task created ${result.id} - ${result.content}`);
       return result;
     } catch (err) {
-      log(`Failed to create tasks with error ${err.message}`);
+      logger.error(`Failed to create tasks with error ${err.message}`);
       return false;
     }
   }
@@ -65,12 +63,12 @@ const Todoist = (function ({ todoistApiKey, label }) {
       filter: filter
     }
     var url = `https://api.todoist.com/rest/v2/tasks/`;
-    log(buildUrl_(url, queryParams));
+    logger.info(buildUrl_(url, queryParams));
     try {
       var result = UrlFetchApp.fetch(buildUrl_(url, queryParams), params);
       return JSON.parse(result);
     } catch (err) {
-      log(`Failed to get tasks with filter "${filter}" with error ${err.message}`);
+      logger.error(`Failed to get tasks with filter "${filter}" with error ${err.message}`);
       return false;
     }
   }
@@ -87,7 +85,7 @@ const Todoist = (function ({ todoistApiKey, label }) {
       var result = UrlFetchApp.fetch(url, params);
       return JSON.parse(result);
     } catch (err) {
-      log(`Failed to get task ${taskId} with error ${err.message}`);
+      logger.error(`Failed to get task ${taskId} with error ${err.message}`);
       return false;
     }
   }
@@ -109,7 +107,7 @@ const Todoist = (function ({ todoistApiKey, label }) {
       var result = UrlFetchApp.fetch(url, params);
       return JSON.parse(result);;
     } catch (err) {
-      log(`Failed to update tasks with error ${err.message}`);
+      logger.error(`Failed to update tasks with error ${err.message}`);
       return false;
     }
   }
@@ -131,7 +129,7 @@ const Todoist = (function ({ todoistApiKey, label }) {
       var result = UrlFetchApp.fetch(url, params);
       return JSON.parse(result);
     } catch (err) {
-      log(`Failed to create comment with error ${err.message}`);
+      logger.error(`Failed to create comment with error ${err.message}`);
       return false;
     }
   }
@@ -148,7 +146,7 @@ const Todoist = (function ({ todoistApiKey, label }) {
       var result = UrlFetchApp.fetch(url, params);
       return JSON.parse(result);
     } catch (err) {
-      log(`Failed to get comments with error ${err.message}`);
+      logger.error(`Failed to get comments with error ${err.message}`);
       return false;
     }
   }
@@ -160,11 +158,11 @@ const Todoist = (function ({ todoistApiKey, label }) {
       headers: { Authorization: "Bearer " + todoistApiKey },
       muteHttpExceptions: false
     };
-    log(`Deleting ${commentIds.length} comments`);
+    logger.info(`Deleting ${commentIds.length} comments`);
     var results = [];
     commentIds.forEach((id) => {
       var url = `https://api.todoist.com/rest/v2/comments/${id}`;
-      log(url);
+      logger.info(url);
       try {
         var result = UrlFetchApp.fetch(url, params);
         results.push({
@@ -172,7 +170,7 @@ const Todoist = (function ({ todoistApiKey, label }) {
           result: 'OK'
         });
       } catch (err) {
-        log(`Failed to delete comments with error ${err.message}`);
+        logger.error(`Failed to delete comments with error ${err.message}`);
         results.push({
           id: id,
           result: 'FAIL'
@@ -183,10 +181,10 @@ const Todoist = (function ({ todoistApiKey, label }) {
 
 
   function getUpdatedTasks() {
-    log('Start retrieval of updated tasks');
+    logger.info('Start retrieval of updated tasks');
     var scriptProperties = PropertiesService.getScriptProperties();
     var syncToken = scriptProperties.getProperty(SYNC_TOKEN) ?? '*';
-    log(`Synctoken present: ${syncToken}`);
+    logger.info(`Synctoken present: ${syncToken}`);
     var url = 'https://api.todoist.com/sync/v9/sync';
     var params = {
       method: "POST",
@@ -207,11 +205,11 @@ const Todoist = (function ({ todoistApiKey, label }) {
       var uniqueTasks = Array.from(
         tasks.reduce((map, task) => map.set(task.id, task), new Map()).values()
       );
-      log(`${uniqueTasks.length} updated items.`);
+      logger.info(`${uniqueTasks.length} updated items.`);
       scriptProperties.setProperty(SYNC_TOKEN, result.sync_token);
       return uniqueTasks;
     } catch (err) {
-      log(`Failed to get updated tasks with error ${err.message}`);
+      logger.error(`Failed to get updated tasks with error ${err.message}`);
       return false;
     }
 

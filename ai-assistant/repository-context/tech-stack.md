@@ -53,7 +53,9 @@
 
 - **Hosting**: Google Apps Script cloud infrastructure
 - **Deployment**: Push code via clasp to Google Apps Script project
-- **Monitoring**: Google Stackdriver logging (exceptionLogging: "STACKDRIVER")
+- **Monitoring**: 
+  - Google Stackdriver logging (exceptionLogging: "STACKDRIVER")
+  - Structured Logging via `Telemetry.js` (JSON payload for queryable logs)
 - **Timezone**: Europe/Brussels
 
 ---

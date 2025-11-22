@@ -5,6 +5,8 @@ const AI = (function ({
   AGENTS_PROMPTS
 }) {
 
+  const logger = Telemetry.getLogger('AI');
+
   const uploadUrl = `https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=multipart&key=${geminiApiKey}`
   const RETRY_CONFIG = {
     maxTryCount: 3,
@@ -20,9 +22,6 @@ const AI = (function ({
         "url_context": {}
       }
 
-  function log(message) {
-    console.log(`AI: ${message ? JSON.stringify(message, null, 2) : 'null'}`);
-  }
 
   function deleteFile(fileId){
     const params = {
@@ -32,7 +31,7 @@ const AI = (function ({
     }
     const url = `https://generativelanguage.googleapis.com/v1beta/${fileId}?key=${geminiApiKey}`;
     const result = UrlFetchApp.fetch(url, params);
-    log(result.getResponseCode() == 200 ? `Succesfully deleted ${fileId}` : `Error during deleting ${fileId} - ${result.getResponseCode()}`);
+    logger.info(result.getResponseCode() == 200 ? `Succesfully deleted ${fileId}` : `Error during deleting ${fileId} - ${result.getResponseCode()}`);
     return true;
   }
 
@@ -45,7 +44,7 @@ const AI = (function ({
     const matchingFiles = allFiles.filter(file => file.displayName === displayName);
 
     if (matchingFiles.length > 0) {
-      log(`Found ${matchingFiles.length} existing file(s) with displayName "${displayName}", deleting...`);
+      logger.info(`Found ${matchingFiles.length} existing file(s) with displayName "${displayName}", deleting...`);
       for (const file of matchingFiles) {
         deleteFile(file.name);
       }
@@ -92,7 +91,7 @@ const AI = (function ({
         payload: JSON.stringify({ ttl: cacheTtl })
       }
       var result = UrlFetchApp.fetch(url, params);
-      log(result.getResponseCode() == 200 ? `Succesfully updated cache TTL ${cache.displayName}` : `Error during updating cache TTL ${cache.displayName}`);
+      logger.info(result.getResponseCode() == 200 ? `Succesfully updated cache TTL ${cache.displayName}` : `Error during updating cache TTL ${cache.displayName}`);
       PropertiesUtil.setPropertyValue(cacheDisplayName, getCache(cacheDisplayName));
     } else {
       // When the cache is not found we force it to update it.
@@ -106,17 +105,17 @@ const AI = (function ({
     var parts = [];
     for (const key of fileMetaPropertyKeys) {
       var fileMeta = PropertiesUtil.getScriptPropertyObject(key);
-      //log(fileMeta);
+      //logger.info(fileMeta);
       if (fileMeta) {
         if (!fileMeta.uri) {
-          log(`Filemeta for ${key} incorrect, ignoring`);
+          logger.warn(`Filemeta for ${key} incorrect, ignoring`);
           PropertiesUtil.removeProperty(key);
         } else {
           const part = { fileData: { mimeType: fileMeta.mimeType, fileUri: fileMeta.uri } };
           parts.push(part);
         }
       } else {
-        log(`Filemeta not found for key ${key}`);
+        logger.warn(`Filemeta not found for key ${key}`);
         fileMetaPropertyKeys.splice(fileMetaPropertyKeys.indexOf(key), 1);
         PropertiesUtil.saveFilesPropertyValue(fileMetaPropertyKeys);
       }
@@ -151,17 +150,17 @@ const AI = (function ({
     }
     var response = JSON.parse(UrlFetchApp.fetch(`https://generativelanguage.googleapis.com/v1beta/cachedContents?key=${geminiApiKey}`, params));
     if (response.error) {
-      log(response);
+      logger.error(JSON.stringify(response));
       PropertiesUtil.removeProperty(cacheDisplayName);
     } else {
-      log(`Succesfully updated / created cache ${cacheDisplayName}`);
+      logger.info(`Succesfully updated / created cache ${cacheDisplayName}`);
       PropertiesUtil.setPropertyValue(cacheDisplayName, response);
     }
   }
 
   function removeCache(cacheName) {
     UrlFetchApp.fetch(`https://generativelanguage.googleapis.com/v1beta/${cacheName}?key=${geminiApiKey}`, { method: 'delete' });
-    log(`Removed cache ${cacheName}`);
+    logger.info(`Removed cache ${cacheName}`);
   }
 
   function getCache(cacheDisplayName) {
@@ -172,11 +171,11 @@ const AI = (function ({
       if (response.getResponseCode() == 200) {
         return JSON.parse(response.getContentText());
       } else {
-        log(`Cache ${cacheDisplayName} not found in Gemini.`);
+        logger.warn(`Cache ${cacheDisplayName} not found in Gemini.`);
         return null;
       }
     } else {
-      log(`Cache ${cacheDisplayName} not found in properties`);
+      logger.info(`Cache ${cacheDisplayName} not found in properties`);
       return null;
     }
 
@@ -217,7 +216,7 @@ const AI = (function ({
       const res = UrlFetchApp.fetch(uploadUrl, options).getContentText();
       return JSON.parse(res).file;
     } catch (err) {
-      log(`Failed to upload file "${fileName}"`, err);
+      logger.error(`Failed to upload file "${fileName}"`, err);
       return false;
     }
   }
@@ -250,7 +249,7 @@ const AI = (function ({
     if (files && files.length > 0) {
       contents.unshift(buildFileParts(files));
     } else {
-      log("No files provided.");
+      logger.info("No files provided.");
     }
 
     if (!tools || tools.length == 0) {
@@ -307,7 +306,7 @@ const AI = (function ({
 
       // Log token usage metadata if available
       if (result.usageMetadata) {
-        log({
+        logger.info({
           message: "API Response Token Usage",
           model: geminiModel,
           tokenUsage: {
@@ -322,10 +321,10 @@ const AI = (function ({
       if (result.error) {
         const errorMessage = `${result.error.message} - ${result.error.status}`;
         if (tryCount >= RETRY_CONFIG.maxTryCount) {
-          log(`Failed to retrieve data from ai ${errorMessage}`);
+          logger.error(`Failed to retrieve data from ai ${errorMessage}`);
           return [errorMessage];
         } else {
-          log(`Error during processing, trying again in ${RETRY_CONFIG.intervalSeconds} seconds, error: ${errorMessage}`);
+          logger.warn(`Error during processing, trying again in ${RETRY_CONFIG.intervalSeconds} seconds, error: ${errorMessage}`);
           Utilities.sleep(RETRY_CONFIG.intervalSeconds * 1000);
           return processCall(contents, systemInstruction, files, tools, functions, tryCount + 1);
         }
@@ -334,19 +333,19 @@ const AI = (function ({
       try {
         returnValue = result.candidates[0].content.parts.map((part) => part.text);
       }catch(err){
-        log(`Error reading result ${JSON.stringify(result)}`);
+        logger.error(`Error reading result ${JSON.stringify(result)}`);
       }
       if (!returnValue[0]){
         // check if it is a function call and take the first one.
         var functionResults = result.candidates[0].content.parts.map((part) => part.functionCall);
-        log(`Function calls detected: ${JSON.stringify(functionResults)}`);
+        logger.info(`Function calls detected: ${JSON.stringify(functionResults)}`);
         if (functionResults.length > 2){
-          log(`Too many function calls being triggered. ${functionResults.length} `);
+          logger.warn(`Too many function calls being triggered. ${functionResults.length} `);
           functionResults = functionResults.slice(0, 2);
         }
         for (const functionCall of functionResults){
           const functionName = functionCall.name;
-          log(`Triggered function call ${functionName}`);
+          logger.info(`Triggered function call ${functionName}`);
           const args = functionCall.args;
           const functionDef = functions[0].functionDeclarations.find(fd => fd[functionName]);
           // This will only work when the args of the function has only 1 parameter since we do Object.values(args)[0].
@@ -355,11 +354,11 @@ const AI = (function ({
         }
         return processCall(contents, systemInstruction, files, tools, functions, 0);
       }else {
-        log(`Text: ${returnValue}`);
+        logger.info(`Text: ${returnValue}`);
       }
       return returnValue;
     } catch (err) {
-      log(`Failed to retrieve data from AI ${err.message}`);
+      logger.error(`Failed to retrieve data from AI ${err.message}`);
       return [`Failed to retrieve data from AI ${err.message}`];
     }
   }

@@ -1,1 +1,1 @@
-For context always load @AGENTS.md file
+Always start with the "AGENTS.md" file.

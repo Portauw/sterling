@@ -1,7 +1,6 @@
 const Calendar = (function ({ defaultCalendarId, workDayStartHour = 8, workDayEndHour = 18 }) {
-  function log(message) {
-    console.log(`Calendar: ${message ? JSON.stringify(message, null, 2) : 'null'}`);
-  }
+  
+  const logger = Telemetry.getLogger('Calendar');
 
   /**
    * Get function schemas for Gemini API function calling
@@ -148,7 +147,7 @@ const Calendar = (function ({ defaultCalendarId, workDayStartHour = 8, workDayEn
 
 
   function getEventsForDate(calendarId = defaultCalendarId, date = new Date(), maxResults = 20) {
-    log(`Getting calendarItems for ${calendarId}`);
+    logger.info(`Getting calendarItems for ${calendarId}`);
     try {
       const calendar = CalendarApp.getCalendarById(calendarId);
       
@@ -190,7 +189,7 @@ const Calendar = (function ({ defaultCalendarId, workDayStartHour = 8, workDayEn
             const fullEvent = FullCalendar.Events.get(calendarId, event.getId().split('@')[0]);
             eventResult.recurrence = fullEvent.recurrence[0];
           } catch (err){
-            log(`Error during retrieval event recurrence for ${event.getTitle()}`)
+            logger.error(`Error during retrieval event recurrence for ${event.getTitle()}`)
           }
         }
         return eventResult;
@@ -547,7 +546,7 @@ const Calendar = (function ({ defaultCalendarId, workDayStartHour = 8, workDayEn
       return null;
 
     } catch (err) {
-      log(`Error in findOpenSlot: ${err}`);
+      logger.error(`Error in findOpenSlot: ${err}`);
       return null;
     }
   }

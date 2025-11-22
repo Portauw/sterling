@@ -51,6 +51,7 @@
 ├── Calendar.js             # Google Calendar client
 ├── GoogleTask.js           # Google Tasks client
 ├── Vault.js                # Google Drive file manager
+├── Telemetry.js            # Centralized structured logging
 ├── PropertiesUtil.js       # Properties Service wrapper
 ├── test.js                 # Test configuration and functions
 ├── appsscript.json         # Google Apps Script configuration
@@ -78,7 +79,21 @@
 
 **Used by**: Called manually via Apps Script triggers or editor
 
-### Component 2: Processor.js (Central Orchestrator)
+### Component 2: Telemetry.js (Logging Service)
+
+**Location**: `Telemetry.js`
+
+**Responsibility**: Provides centralized, structured logging (Stackdriver compatible) for all modules. Uses a singleton pattern.
+
+**Key files**:
+- `Telemetry.js:1`: Singleton initialization
+- `Telemetry.js:45`: getLogger factory method
+
+**Depends on**: Console API (for Stackdriver output)
+
+**Used by**: All components (Processor, AI, Todoist, etc.)
+
+### Component 3: Processor.js (Central Orchestrator)
 
 **Location**: `Processor.js`
 
@@ -95,7 +110,7 @@
 
 **Used by**: Main.js and test.js
 
-### Component 3: AI.js (Gemini Client)
+### Component 4: AI.js (Gemini Client)
 
 **Location**: `AI.js`
 

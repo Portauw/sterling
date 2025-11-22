@@ -12,10 +12,9 @@ const Processor = (function ({
   workDayEndHour
 }) {
 
-  function log(message) {
-    console.log(`Processor: ${message !== null ? JSON.stringify(message, null, 2) : 'null'}`);
-  }
-  log('Initialising processor');
+  const logger = Telemetry.getLogger('Processor');
+
+  logger.info('Initialising processor');
 
   const AI_RESULT_PREFIX = 'AI:';
   const ENRICHT_LABEL = 'enrich';
@@ -36,7 +35,7 @@ const Processor = (function ({
     });
   const CalendarClient = Calendar({ defaultCalendarId: calendarId, workDayStartHour: workDayStartHour, workDayEndHour: workDayEndHour });
 
-  log('Initialising processor completed');
+  logger.info('Initialising processor completed');
   
 
   function processContextData(forceUpdate = false) {
@@ -50,13 +49,13 @@ const Processor = (function ({
           var fileResult = AiClient.uploadFile(file.getName(), file.getBlob());
           if (fileResult) {
             PropertiesUtil.setPropertyValue(file.getName(), fileResult);
-            log(`Updated file ${file.getName()}`);
+            logger.info(`Updated file ${file.getName()}`);
             needsCacheUpdate = true;
           } else {
-            log(`Something went wrong with the file upload for ${file.getName()}`);
+            logger.error(`Something went wrong with the file upload for ${file.getName()}`);
           }
         } else {
-          log(`No need to update file ${file.getName()}`);
+          logger.info(`No need to update file ${file.getName()}`);
         }
       }
     }
@@ -64,9 +63,9 @@ const Processor = (function ({
   }
 
   function enrichTodaysTasksForLabel(label) {
-    log(`Enrichting for label: ${label}`);
+    logger.info(`Enrichting for label: ${label}`);
     var result = TodoistClient.getTasksByFilter(`today&@${label}`);
-    log(`Enriching ${result.length} tasks`);
+    logger.info(`Enriching ${result.length} tasks`);
     for (const task of result) {
       var comments = TodoistClient.getCommentsForTask(task.id);
       if (comments.length > 0) {
@@ -80,7 +79,7 @@ const Processor = (function ({
   }
 
   function enrichTodoistTask(task, comments) {
-    log(`Enrichting task: ${JSON.stringify(task)}`)
+    logger.info(`Enrichting task: ${JSON.stringify(task)}`)
     var content = [];
     content.push(AiClient.buildTextContent('user', `Given this task with title ${task.content} and optional description ${task.description}`));
     if (comments?.length > 0) {
@@ -96,11 +95,11 @@ const Processor = (function ({
     aiResult.forEach((item) => {
       TodoistClient.createComment(task.id, `${AI_RESULT_PREFIX} ${item}`);
     });
-    log(`Task ${task.id} was enriched`);
+    logger.info(`Task ${task.id} was enriched`);
   }
 
   function enrichTodoistTasks() {
-    log('Enriching todoist tasks');
+    logger.info('Enriching todoist tasks');
     var tasks = TodoistClient.getUpdatedTasks();
     for (const task of tasks) {
       try {
@@ -115,10 +114,10 @@ const Processor = (function ({
             TodoistClient.updateTask(task);
           }
         } else {
-          log(`Task ${task.id} not to be enriched`);
+          logger.info(`Task ${task.id} not to be enriched`);
         }
       } catch (err) {
-        log(`Failed to enrich task with error ${err.message}`);
+        logger.error(`Failed to enrich task with error ${err.message}`);
       }
     }
     return true;
@@ -127,13 +126,13 @@ const Processor = (function ({
   function processGoogleTasks() {
     var tasks = GoogleTaskClient.listTaskLists();
     if (!tasks) {
-      log('Failed to get tasks');
+      logger.error('Failed to get tasks');
     } else {
       var result = createTodoistTasks(tasks);
       if (!result) {
-        log('Failed to create tasks in todoist');
+        logger.error('Failed to create tasks in todoist');
       } else {
-        log(`Created: ${tasks.length} tasks in Todoist`);
+        logger.info(`Created: ${tasks.length} tasks in Todoist`);
         GoogleTaskClient.markGoogleTasksDone(tasks);
       }
     }
@@ -161,7 +160,7 @@ const Processor = (function ({
         result: tasks
       };
     } catch (err) {
-      log(`Failed with error ${err.message}`);
+      logger.error(`Failed with error ${err.message}`);
       return {
         success: false,
         error: err.message
@@ -170,30 +169,30 @@ const Processor = (function ({
   }
 
   function filterEventsForProcessing(events) {
-    log(`Filtering ${events.length} events for processing`);
+    logger.info(`Filtering ${events.length} events for processing`);
 
     const filtered = events.filter(event => {
       // Skip all-day events
       if (event.isAllDay) {
-        log(`Skipping all-day event: ${event.title}`);
+        logger.info(`Skipping all-day event: ${event.title}`);
         return false;
       }
 
       // Only process events with attendees (more than just the user)
       if (!event.attendees || event.attendees.length <= 0) {
-        log(`Skipping event with no other attendees: ${event.title}`);
+        logger.info(`Skipping event with no other attendees: ${event.title}`);
         return false;
       }
 
       return true;
     });
 
-    log(`Filtered to ${filtered.length} events for processing`);
+    logger.info(`Filtered to ${filtered.length} events for processing`);
     return filtered;
   }
 
   function prepareCalendarEventsContext(events) {
-    log(`Preparing events with context`);
+    logger.info(`Preparing events with context`);
     const systemInstruction = AGENTS_PROMPTS;
 
     var contents = [
@@ -205,7 +204,7 @@ const Processor = (function ({
     // const functions = DRIVE_FUNCTIONS;
     // Not passing the tools or functions along since not needed for this.
     var result = extractJsonFromResponse(AiClient.processCall(contents, systemInstruction, files, [], [], 0)[0]);
-    log(`Done preparing events.`);
+    logger.info(`Done preparing events.`);
     return result;
   }
 
@@ -242,23 +241,23 @@ const Processor = (function ({
   }
 
   function processCalendarItems() {
-    log(`Processing calendar items`);
+    logger.info(`Processing calendar items`);
     const result = CalendarClient.getEventsForDate(calendarId, new Date());
     if (result.success) {
       const returnValue = [];
       try {
         if (result.events.length > 0) {
-          log(`Retrieved ${result.events.length} calendar items`);
+          logger.info(`Retrieved ${result.events.length} calendar items`);
           const filteredEvents = filterEventsForProcessing(result.events);
 
           if (filteredEvents.length === 0) {
-            log(`No events to process after filtering`);
+            logger.info(`No events to process after filtering`);
             return returnValue;
           }
 
           // 1. Identification Phase: Gather all tasks needing preparation
           // Process all filtered events in one go
-          log(`Processing ${filteredEvents.length} events for identification`);
+          logger.info(`Processing ${filteredEvents.length} events for identification`);
           
           const eventsWithContext = prepareCalendarEventsContext(filteredEvents);
           const tasksToSchedule = [];
@@ -268,7 +267,7 @@ const Processor = (function ({
              if (event.preparation) {
                 tasksToSchedule.push(event);
              } else {
-                log(`Not processing event ${event.title} since not needed.`);
+                logger.info(`Not processing event ${event.title} since not needed.`);
              }
           }
 
@@ -277,23 +276,23 @@ const Processor = (function ({
              const scheduledTasks = schedulePreparationTasks(tasksToSchedule, result.events, filteredEvents);
              returnValue.push(...scheduledTasks);
           } else {
-             log("No preparation tasks identified.");
+             logger.info("No preparation tasks identified.");
           }
 
         } else {
-          log(`No events found.`);
+          logger.info(`No events found.`);
         }
       } catch (err) {
-        log(`Error during processing calendar result ${JSON.stringify(result)} due to error: ${err}`);
+        logger.error(`Error during processing calendar result ${JSON.stringify(result)} due to error: ${err}`);
       }
       return returnValue;
     } else {
-      log(`Error occured during retrieval of calendarEvents ${result.error}`);
+      logger.error(`Error occured during retrieval of calendarEvents ${result.error}`);
     }
   }
 
   function schedulePreparationTasks(tasksToSchedule, allEvents, filteredEvents) {
-    log(`Identified ${tasksToSchedule.length} tasks to schedule. Starting planning phase.`);
+    logger.info(`Identified ${tasksToSchedule.length} tasks to schedule. Starting planning phase.`);
     const scheduledTasks = [];
     
     // Sort tasks by event start time to schedule earlier meetings first
@@ -304,11 +303,11 @@ const Processor = (function ({
 
     for (const event of tasksToSchedule) {
       try {
-          log(`Scheduling preparation for: ${event.title}`);
+          logger.info(`Scheduling preparation for: ${event.title}`);
           var date = new Date();
           const eventStart = new Date(event.startTime);
           // Use AI estimated duration or default to 45
-          log(`Estimated duration: ${event.duration_estimation}`);
+          logger.info(`Estimated duration: ${event.duration_estimation}`);
           const duration = event.duration_estimation || 45;
           
           // Strategy 1: Strict - Avoid ALL events (filtered + skipped/placeholders)
@@ -323,7 +322,7 @@ const Processor = (function ({
 
           // Strategy 2: Lenient - Avoid ONLY processed events (allow overlap with skipped/placeholders)
           if (!scheduledTime) {
-              log(`No strict slot found for ${event.title}. Trying lenient strategy (overlapping skipped events).`);
+              logger.info(`No strict slot found for ${event.title}. Trying lenient strategy (overlapping skipped events).`);
               const lenientBusyList = [...filteredEvents, ...newlyScheduledSlots].map(e => ({
                   startTime: e.startTime,
                   endTime: e.endTime,
@@ -337,7 +336,7 @@ const Processor = (function ({
           if (scheduledTime) {
             date = scheduledTime;
             const endTime = new Date(date.getTime() + duration * 60000);
-            log(`Scheduled (${schedulingStrategy}) preparation for ${event.title} at ${date.toISOString()} - ${endTime.toISOString()} (${duration} mins)`);
+            logger.info(`Scheduled (${schedulingStrategy}) preparation for ${event.title} at ${date.toISOString()} - ${endTime.toISOString()} (${duration} mins)`);
             
             // Add this new slot to our tracker
             newlyScheduledSlots.push({
@@ -349,7 +348,7 @@ const Processor = (function ({
             // Strategy 3: Fallback
             date = new Date(eventStart);
             date.setHours(date.getHours() - 2);
-            log(`No open slot found (Strict or Lenient). Scheduled preparation for ${event.title} at fallback time: ${date.toISOString()}`);
+            logger.info(`No open slot found (Strict or Lenient). Scheduled preparation for ${event.title} at fallback time: ${date.toISOString()}`);
           }
 
           const task = {
@@ -369,18 +368,102 @@ const Processor = (function ({
           Utilities.sleep(2 * 1000);
 
       } catch (err) {
-          log(`Error during scheduling event ${event.title}. Due to ${err}`);
+          logger.error(`Error during scheduling event ${event.title}. Due to ${err}`);
       }
     }
     return scheduledTasks;
   }
 
+  function generateDailyBriefing() {
+    logger.info('Generating Daily Briefing...');
+
+    try {
+      // 1. Gather Data
+      const today = new Date();
+      const calendarResult = CalendarClient.getEventsForDate(calendarId, today);
+      
+      // Filter: Today's tasks, Overdue tasks, or Priority 1 tasks
+      // Todoist API: P1 is priority 4, P2 is 3, etc.
+      // We fetch a broad range to give the AI context
+      const tasks = TodoistClient.getTasksByFilter("today | overdue | p1");
+      
+      const calendarData = calendarResult.success ? calendarResult.events : [];
+      const taskData = tasks ? tasks.map(t => ({
+        content: t.content,
+        description: t.description, 
+        priority: t.priority,
+        due: t.due ? t.due.string : 'no date'
+      })) : [];
+
+      logger.info(`Gathered ${calendarData.length} events and ${taskData.length} tasks.`);
+
+      // 2. Synthesize with AI
+      const promptData = JSON.stringify({
+        date: today.toLocaleDateString(),
+        events: calendarData,
+        tasks: taskData
+      }, null, 2);
+
+      const prompt = `
+      You are an elite Executive Assistant.
+      Date: ${today.toLocaleDateString()}
+
+      ## Inputs
+      ${promptData}
+
+      ## Instruction
+      Analyze the schedule and tasks. Produce a "Daily Briefing" in succinct Markdown.
+      
+      Structure:
+      1. **🛑 Critical Focus**: The 1-2 absolute must-do items (meetings or tasks) today.
+      2. **🗓️ Schedule Highlights**: Brief timeline. Flag tight transitions or conflicts.
+      3. **⚡ Quick Wins**: Tasks that can be knocked out in 15 mins.
+      4. **🧠 Prep Notes**: Mention any meeting that lacks a "preparation task" or agenda (based on title/description).
+      
+      Keep it concise, professional, and action-oriented.
+      `;
+
+      const systemInstruction = "You are a helpful, concise executive assistant.";
+      const files = []; // No file context needed for speed/cost
+
+      const aiResponse = AiClient.processCall(
+        [AiClient.buildTextContent('user', prompt)],
+        systemInstruction,
+        files
+      );
+
+      if (!aiResponse || aiResponse.length === 0) {
+        throw new Error("AI failed to generate briefing content.");
+      }
+
+      const briefingContent = aiResponse[0];
+
+      // 3. Delivery to Todoist
+      const briefingTask = {
+        title: `📅 Daily Briefing: ${today.toLocaleDateString()}`,
+        description: briefingContent,
+        priority: 4, // P1
+        due_string: "today",
+        project_id: todoistProjectId,
+        labels: [] 
+      };
+
+      TodoistClient.createTask(briefingTask);
+      logger.info('Daily Briefing created successfully.');
+      return true;
+
+    } catch (err) {
+      logger.error(`Error generating daily briefing: ${err.message}`);
+      return false;
+    }
+  }
+
   function aiFileManagement() {
     const grouping ={};
     const aifiles = AiClient.getFiles();
-    log(`Amount of files: ${aifiles.length}`);
+    logger.info(`Amount of files: ${aifiles.length}`);
     for (const file of aifiles){
-      log(`${file.name} - ${file.displayName}`);
+      logger.info(`${file.name} - ${file.displayName}`);
       if (!grouping[file.displayName]){
         grouping[file.displayName] = [file];
       }else {
@@ -389,15 +472,13 @@ const Processor = (function ({
     }
     for (const [key, value] of Object.entries(grouping)) {
       if (value.length > 1){
-        log(`size: ${value.length} - ${JSON.stringify(value.slice(1))}`)
+        logger.info(`size: ${value.length} - ${JSON.stringify(value.slice(1))}`)
         const sliced = value.slice(1);
         for (const f of sliced){
-          log(AiClient.deleteFile(f.name));
+          logger.info(AiClient.deleteFile(f.name));
         }
       }
     }
-
-    //log(grouping);
   }
 
   return {
@@ -406,7 +487,8 @@ const Processor = (function ({
     processContextData,
     enrichTodaysTasksForLabel,
     processCalendarItems,
-    aiFileManagement
+    aiFileManagement,
+    generateDailyBriefing
   }
 });
 

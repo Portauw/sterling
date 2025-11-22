@@ -57,42 +57,66 @@ const ServiceName = (function ({
 
 ---
 
-## Pattern 2: Consistent Logging Pattern
+## Pattern 2: Structured Logging with Telemetry
 
-**What**: Standardized logging format with module-specific prefixes and JSON stringification
+**What**: Centralized, structured logging using a Singleton Telemetry service. Logs are emitted as JSON objects for Stackdriver analysis.
 
-**Where**: Every service module (all .js files)
+**Where**: All modules (Processor.js, AI.js, etc.) use `Telemetry.getLogger()`
 
-**Example**: `AI.js:23-25`, `Todoist.js:19-21`, `Processor.js:13-14`
+**Example**: `Telemetry.js` (implementation), `Processor.js` (usage)
 
-**When to use**: In every module for debugging and monitoring
+**When to use**: ALWAYS. Replaces the old `log()` function pattern.
 
 **Structure/Example:**
 ```javascript
-function log(message) {
-  console.log(`ModuleName: ${message ? JSON.stringify(message, null, 2) : 'null'}`);
-}
+// 1. Initialization (Main.js)
+Telemetry.init({ todoistApiKey: '...', env: 'PROD' });
 
-// Usage:
-log('Simple message');
-log({ taskId: 123, status: 'completed' });
-log(complexObject);
+// 2. Usage (Any Module)
+const logger = Telemetry.getLogger('ModuleName');
+
+logger.info('Task processed', { taskId: 123, status: 'ok' });
+logger.error('API Failed', { error: err.message });
 ```
 
 **Key aspects:**
-- Always includes module name prefix for traceability
-- JSON.stringify with 2-space indentation for readability
-- Handles null/undefined gracefully
-- Shows up in Stackdriver logging
-- Critical for debugging serverless functions
-
-**Common mistakes to avoid:**
-- Don't use plain `console.log()`: Always use the module's `log()` function
-- Don't forget to handle null/undefined: Use ternary operator for safety
+- **Singleton**: initialized once in Main.js
+- **Factory**: `getLogger(name)` creates context-aware loggers
+- **Structured**: Output is JSON, allowing SQL-like querying in Google Cloud Logging
+- **Severity Levels**: `debug`, `info`, `warn`, `error` map to Stackdriver levels
 
 ---
 
-## Pattern 3: Properties Service for State Management
+## Pattern 3: Singleton Service Pattern
+
+**What**: A global service initialized once via an `init()` method, holding shared state (configuration) for the application lifecycle.
+
+**Where**: `Telemetry.js`
+
+**Example**: `Telemetry.js`
+
+**When to use**: For cross-cutting concerns like Logging, Monitoring, or global configuration that every module needs.
+
+**Structure/Example:**
+```javascript
+const MySingleton = (function() {
+  let config = {};
+  
+  return {
+    init: (cfg) => { config = cfg; },
+    doSomething: () => { /* use config */ }
+  }
+})();
+```
+
+**Key aspects:**
+- Encapsulated state via closure
+- Public `init` method for setup
+- Globally available in Apps Script environment without passing as dependency
+
+---
+
+## Pattern 4: Properties Service for State Management
 
 **What**: Using Google Apps Script Properties Service as a key-value store with expiration tracking
 

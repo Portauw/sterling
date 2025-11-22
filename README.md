@@ -144,7 +144,7 @@ sequenceDiagram
 ```
 
 ### Key Details:
-- **Trigger**: Manual execution of `test.js:processGoogleTasks()`
+- **Trigger**: Time-driven, every 10 minutes
 - **Time Window**: Tasks updated in last 35 minutes
 - **Label Mapping**: EMAIL type tasks get 'email' label + configured label
 - **Completion**: Google Tasks marked complete after Todoist creation
@@ -271,7 +271,7 @@ sequenceDiagram
 ```
 
 ### Key Details:
-- **Trigger**: Manual execution of `test.js:test()` or scheduled
+- **Trigger**: Time-driven, every 10 minutes
 - **Enrichment Criteria**: Task has 'enrich' label OR last comment contains '@ai'
 - **AI Context**:
   - System instruction from Drive file (agents_prompt)
@@ -343,75 +343,67 @@ sequenceDiagram
             Note over Processor: No events to process, return early
         end
 
-        Processor->>Processor: Create batches of 3 events
-        Note over Processor: Split filteredEvents into batches<br/>to reduce token usage per API call
+        Processor->>Processor: prepareCalendarEventsContext(filteredEvents)
+        activate Processor
 
-        loop For each batch
-            Processor->>Processor: prepareCalendarEventsContext(batch)
+        Processor->>AI: buildTextContent('user', JSON.stringify(filteredEvents))
+        Processor->>Vault: getFile(calendar_instructions_prompt)
+        Vault-->>Processor: CALENDAR_INSTRUCTIONS_PROMPT
+        Processor->>AI: buildTextContent('user', CALENDAR_INSTRUCTIONS_PROMPT)
+
+        Processor->>Vault: getDriveTools()
+        Vault-->>Processor: DRIVE_FUNCTIONS
+
+        Processor->>AI: processCall(contents, AGENTS_PROMPTS, [], [], DRIVE_FUNCTIONS)
+        activate AI
+        AI->>GeminiAPI: POST /v1beta/models/{model}:generateContent
+        Note over AI,GeminiAPI: Request: events JSON,<br/>calendar instructions,<br/>system prompts, Drive functions
+        GeminiAPI-->>AI: JSON response
+        AI-->>Processor: response text
+        deactivate AI
+
+        Processor->>Processor: extractJsonFromResponse(response)
+        Note over Processor: Parse JSON from markdown blocks<br/>or extract from response text
+
+        Processor-->>Processor: eventsWithContext
+        deactivate Processor
+
+        Processor->>Processor: Identify tasks needing preparation
+        
+        alt tasksToSchedule.length > 0
+            Processor->>Processor: schedulePreparationTasks(tasks, allEvents, filteredEvents)
             activate Processor
+            
+            loop For each task to schedule
+                Processor->>Calendar: findOpenSlot(events, start, duration)
+                activate Calendar
+                Note over Calendar: 3-Tier Strategy:<br/>1. Strict (All events)<br/>2. Lenient (Filtered only)<br/>3. Fallback (-2h)
+                Calendar-->>Processor: openSlot or null
+                deactivate Calendar
 
-            Processor->>AI: buildTextContent('user', JSON.stringify(batch))
-            Processor->>Vault: getFile(calendar_instructions_prompt)
-            Vault-->>Processor: CALENDAR_INSTRUCTIONS_PROMPT
-            Processor->>AI: buildTextContent('user', CALENDAR_INSTRUCTIONS_PROMPT)
+                Processor->>Processor: Build prep task
+                Note over Processor: Title: "Prepare for {event.title}"<br/>Description: event.meeting_preparation_prompt<br/>Labels: ['enrich_scheduled']<br/>Project: configured todoistProjectId
 
-            Processor->>Vault: getDriveTools()
-            Vault-->>Processor: DRIVE_FUNCTIONS
+                Processor->>Processor: createTodoistTasks([task])
+                activate Processor
+                Processor->>Todoist: createTask(task)
+                activate Todoist
+                Todoist->>TodoistAPI: POST /rest/v2/tasks
+                TodoistAPI-->>Todoist: task created
+                Todoist-->>Processor: result
+                deactivate Todoist
+                Processor-->>Processor: success
+                deactivate Processor
 
-            Processor->>AI: processCall(contents, AGENTS_PROMPTS, [], [], DRIVE_FUNCTIONS)
-            activate AI
-            AI->>GeminiAPI: POST /v1beta/models/{model}:generateContent
-            Note over AI,GeminiAPI: Request: batch (3 events) JSON,<br/>calendar instructions,<br/>system prompts, Drive functions
-            GeminiAPI-->>AI: JSON response
-            AI-->>Processor: response text
-            deactivate AI
-
-            Processor->>Processor: extractJsonFromResponse(response)
-            Note over Processor: Parse JSON from markdown blocks<br/>or extract from response text
-
-            Processor-->>Processor: eventsWithContext for batch
+                Processor->>Processor: Sleep 2 seconds
+                Note over Processor: Rate limiting
+            end
+            
             deactivate Processor
-
-            alt More batches remaining
-                Processor->>Processor: Sleep 10 seconds
-                Note over Processor: Rate limit between batches
-            end
-
-                loop For each enriched event in batch
-                    alt event.preparation == true
-                        Processor->>Calendar: findOpenSlot(events, start, duration)
-                        activate Calendar
-                        Calendar-->>Processor: openSlot or null
-                        deactivate Calendar
-
-                        alt Slot Found
-                            Note over Processor: due_date = openSlot
-                        else No Slot
-                            Note over Processor: due_date = event.startTime - 2 hours
-                        end
-
-                        Processor->>Processor: Build prep task
-                        Note over Processor: Title: "Prepare for {event.title}"<br/>Description: event.meeting_preparation_prompt<br/>Labels: ['enrich_scheduled']<br/>Project: configured todoistProjectId
-
-                        Processor->>Processor: createTodoistTasks([task])
-                        activate Processor
-                        Processor->>Todoist: createTask(task)
-                        activate Todoist
-                        Todoist->>TodoistAPI: POST /rest/v2/tasks
-                        TodoistAPI-->>Todoist: task created
-                        Todoist-->>Processor: result
-                        deactivate Todoist
-                        Processor-->>Processor: success
-                        deactivate Processor
-
-                        Processor->>Processor: Sleep 20 seconds
-                        Note over Processor: Rate limiting for AI processing
-                    else No preparation needed
-                        Note over Processor: Skip event
-                    end
-                end
-            end
+        else No preparation tasks
+             Note over Processor: Log and continue
         end
+
     else No events or error
         Note over Processor: Log and exit
     end
@@ -421,7 +413,7 @@ sequenceDiagram
 ```
 
 ### Key Details:
-- **Trigger**: Manual execution of `test.js:calendar()`
+- **Trigger**: Time-driven, daily between 6 AM and 7 AM
 - **Event Selection**: Today's events where user status is INVITED/MAYBE/YES/OWNER
 - **Smart Filtering** (Processor.js:163):
   - Skips all-day events (no preparation needed)
@@ -555,7 +547,7 @@ sequenceDiagram
 ```
 
 ### Key Details:
-- **Trigger**: Called during initialization or manually
+- **Trigger**: Time-driven, every 5 minutes
 - **Drive Folders**: Configured in test.js (PEOPLE_FOLDER, TRIBE_FOLDER, INITIATIVES, ITP_GENERAL, ITP_MEETINGS)
 - **Update Criteria**:
   - File has no stored metadata
@@ -578,12 +570,12 @@ This flow shows how the system manages persistent state and caching.
 ```mermaid
 graph TB
     subgraph "Script Properties Storage"
-        FileProps[FILE_PROPERTIES<br/>Array of file names]
-        SyncToken[TODOIST_LAST_SYNC_TOKEN<br/>Incremental sync]
-        FileMeta1[File Name 1<br/>{uri, mimeType, updateTime, expirationTime}]
-        FileMeta2[File Name 2<br/>{uri, mimeType, updateTime, expirationTime}]
-        FileMetaN[File Name N<br/>...]
-        CacheMeta[ITP Cache<br/>{name, model, displayName, createTime, updateTime, expireTime}]
+        FileProps["FILE_PROPERTIES<br/>Array of file names"]
+        SyncToken["TODOIST_LAST_SYNC_TOKEN<br/>Incremental sync"]
+        FileMeta1["File Name 1<br/>{uri, mimeType, updateTime, expirationTime}"]
+        FileMeta2["File Name 2<br/>{uri, mimeType, updateTime, expirationTime}"]
+        FileMetaN["File Name N<br/>..."]
+        CacheMeta["ITP Cache<br/>{name, model, displayName, createTime, updateTime, expireTime}"]
     end
 
     subgraph "Processor Operations"
@@ -723,3 +715,13 @@ graph TB
 ```
 
 All flows are triggered through Processor methods, making it the single point of coordination for the entire system.
+
+---
+
+## Flow 6: Just-In-Time Task Preparation
+
+This flow enriches Todoist tasks with the label 'prepare_jit' using AI, preparing them for the day ahead.
+
+### Key Details:
+- **Trigger**: Time-driven, daily between 7 AM and 8 AM, calling `enrichTodaysTasksForLabel` with the parameter `'prepare_jit'`.
+- **Purpose**: Prepare tasks labeled 'prepare_jit' for the current day.
