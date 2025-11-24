@@ -1,0 +1,27 @@
+/**
+ * Example configuration file.
+ * Rename this file to 'test.js' and fill in your actual values.
+ * 'test.js' is ignored by git to protect your secrets.
+ */
+
+function test() {
+  const config = {
+    gTaskListId: "YOUR_GOOGLE_TASK_LIST_ID",
+    calendarId: "YOUR_CALENDAR_ID", // e.g., 'primary'
+    geminiApiKey: "YOUR_GEMINI_API_KEY",
+    geminiModel: "gemini-1.5-pro-latest", // or your preferred model
+    todoistApiKey: "YOUR_TODOIST_API_KEY",
+    label: "AI", // Label to filter/tag tasks
+    todoistProjectId: "YOUR_TODOIST_PROJECT_ID",
+    promptInstructions: "You are a helpful assistant...", // System prompt
+    driveFolders: ["FOLDER_ID_1", "FOLDER_ID_2"], // Optional: Folders to index/search
+    workDayStartHour: 9,
+    workDayEndHour: 17
+  };
+
+  // Execute the main logic
+  const processor = main(config);
+  
+  // Example: Run the processor
+  // processor.process(); 
+}
