@@ -55,7 +55,6 @@ An intelligent automation system that orchestrates your life by integrating Goog
     *   `enrichTodoistTasks` (every 10 mins) - Flow 2
     *   `processContextData` (every 5 mins) - Flow 4
     *   `processCalendarItems` (daily 6-7 AM) - Flow 3
-    *   `generateDailyBriefing` (daily 6-7 AM) - Flow 8
     *   `enrichTodaysTasksForLabel('prepare_jit')` (daily 7-8 AM) - Flow 6
     *   `aiFileManagement` (manual or weekly maintenance) - Flow 7
 
@@ -74,7 +73,6 @@ This document provides comprehensive visual documentation of all data flows in t
 - [Flow 5: Data & State Management](#flow-5-data--state-management)
 - [Flow 6: Just-In-Time Task Preparation](#flow-6-just-in-time-task-preparation)
 - [Flow 7: AI File Management](#flow-7-ai-file-management)
-- [Flow 8: Daily Briefing Generation](#flow-8-daily-briefing-generation)
 
 ---
 
@@ -134,14 +132,14 @@ graph TB
 | Component | Responsibility | Key Methods |
 |-----------|---------------|-------------|
 | **Main.js** | Entry point, configuration initialization | `main()` |
-| **Processor.js** | Central orchestrator for all workflows | `enrichTodoistTasks()`, `processGoogleTasks()`, `processCalendarItems()`, `processContextData()`, `enrichTodaysTasksForLabel()`, `aiFileManagement()`, `generateDailyBriefing()` |
-| **Todoist.js** | Todoist API integration, task & comment management | `createTask()`, `getUpdatedTasks()`, `createComment()`, `getTasksByFilter()`, `deleteComments()` |
+| **Processor.js** | Central orchestrator for all workflows | `enrichTodoistTasks()`, `processGoogleTasks()`, `processCalendarItems()`, `processContextData()`, `enrichTodaysTasksForLabel()`, `aiFileManagement()` |
+| **Todoist.js** | Todoist API integration, task & comment management | `createTask()`, `getUpdatedTasks()`, `createComment()`, `getTasksByFilter()`, `deleteComments()`, `updateTask()`, `getTask()`, `getProjects()` |
 | **GoogleTask.js** | Google Tasks API integration | `listTaskLists()`, `markGoogleTasksDone()` |
-| **AI.js** | Gemini AI client with file upload, caching, retry logic | `processCall()`, `uploadFile()`, `updateOrCreateCache()`, `getFiles()`, `deleteFile()` |
-| **Calendar.js** | Google Calendar event management | `getEventsForDate()`, `findOpenSlot()` |
-| **Vault.js** | Google Drive file access and management | `getFiles()`, `getFile()`, `searchDrive()`, `getDriveTools()` |
-| **PropertiesUtil.js** | Script properties management with expiration | `setPropertyValue()`, `getScriptPropertyObject()`, `isFileExpired()` |
-| **Telemetry.js** | Structured logging and error tracking | `getLogger()`, `info()`, `error()` |
+| **AI.js** | Gemini AI client with file upload, caching, retry logic | `processCall()`, `uploadFile()`, `updateOrCreateCache()`, `getFiles()`, `deleteFile()`, `deleteFileByDisplayName()`, `buildTextContent()` |
+| **Calendar.js** | Google Calendar event management | `getEventsForDate()`, `findOpenSlot()`, `parseTimeString()` |
+| **Vault.js** | Google Drive file access and management | `getFiles()`, `getFile()`, `searchDrive()`, `getDriveTools()`, `wasUpdated()`, `getFileFunction()`, `getSearchFunction()` |
+| **PropertiesUtil.js** | Script properties management with expiration | `setPropertyValue()`, `getScriptPropertyObject()`, `isFileExpired()`, `getFilesPropertyValue()`, `saveFilesPropertyValue()` |
+| **Telemetry.js** | Structured logging and error tracking | `init()`, `getLogger()` (returns logger with `info()`, `error()`, `warn()`, `debug()`) |
 
 ---
 
@@ -508,7 +506,8 @@ sequenceDiagram
   - **3-Tier Scheduling Strategy**:
     1. **Strict**: Attempts to find a slot avoiding *all* calendar events (both processed/filtered and others).
     2. **Lenient**: If strict fails, attempts to find a slot avoiding *only* processed/filtered events (allowing overlap with placeholders/personal items).
-    3. **Fallback**: If both fail, schedules 2 hours before event start.
+    3. **Reduced Duration**: Try 30, 15, 10 minute durations with both strict and lenient strategies.
+    4. **Last Resort Fallback**: If all strategies fail, schedules 30 minutes before event start.
   - Maintains a `newlyScheduledSlots` list to ensure tasks in the same run don't overlap each other.
   - Automatically labeled with 'enrich_scheduled' for later processing
   - Contains AI-generated preparation guidance
@@ -735,7 +734,7 @@ graph TB
     APICall --> Check{Response<br/>has error?}
     Check -->|No| Success[Return results]
     Check -->|Yes| RetryCheck{tryCount <br/> maxTryCount?}
-    RetryCheck -->|Yes, retry| Sleep[Sleep 15 seconds]
+    RetryCheck -->|Yes, retry| Sleep[Sleep 30 seconds]
     Sleep --> Increment[tryCount++]
     Increment --> APICall
     RetryCheck -->|No, give up| Error[Return error message]
@@ -746,14 +745,14 @@ graph TB
 
 **Retry Configuration**:
 - Max retries: 3
-- Interval: 15 seconds
+- Interval: 30 seconds
 - Applies to: All Gemini API calls
 
 ### Rate Limiting
-- **Task Enrichment**: 10 seconds between tasks
+- **Task Enrichment**: 10 seconds between tasks (Flow 2)
 - **Calendar Processing**:
-  - 10 seconds after event analysis
-  - 20 seconds between preparation task creation
+  - 2 seconds between preparation task creation (Flow 3)
+- **Just-In-Time Preparation**: 20 seconds between tasks (Flow 6)
 - **Purpose**: Prevent API throttling, give AI processing time
 
 ---
@@ -778,8 +777,7 @@ graph TB
   processCalendarItems,      // Flow 3: Calendar Event Processing
   processContextData,        // Flow 4: Context Data Update
   enrichTodaysTasksForLabel, // Flow 6: Just-In-Time Task Preparation
-  aiFileManagement,          // Flow 7: AI File Management
-  generateDailyBriefing      // Flow 8: Daily Briefing Generation
+  aiFileManagement           // Flow 7: AI File Management
 }
 ```
 
@@ -942,80 +940,3 @@ sequenceDiagram
 - **Logging**: Detailed logs of file counts and deletions
 - **Use Case**: Prevents storage bloat from repeated file uploads with same name
 - **Safety**: Only deletes from Gemini API, doesn't affect Drive files
-
----
-
-## Flow 8: Daily Briefing Generation
-
-This flow generates an AI-powered daily briefing task summarizing the day's events and priorities.
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Processor
-    participant Calendar
-    participant Todoist
-    participant AI
-    participant CalendarAPI
-    participant TodoistAPI
-    participant GeminiAPI
-
-    User->>Processor: generateDailyBriefing()
-    activate Processor
-
-    Processor->>Calendar: getEventsForDate(calendarId, today)
-    activate Calendar
-    Calendar->>CalendarAPI: CalendarApp.getEventsForDay(today)
-    CalendarAPI-->>Calendar: events[]
-    Calendar-->>Processor: {success, events[]}
-    deactivate Calendar
-
-    Processor->>Todoist: getTasksByFilter("today | overdue | p1")
-    activate Todoist
-    Todoist->>TodoistAPI: GET /rest/v2/tasks?filter={filter}
-    TodoistAPI-->>Todoist: tasks[]
-    Todoist-->>Processor: tasks[]
-    deactivate Todoist
-
-    Processor->>Processor: Format data for AI
-    Note over Processor: Extract: content, description,<br/>priority, due date from tasks<br/>All event data from calendar
-
-    Processor->>Processor: Build briefing prompt
-    Note over Processor: Structured prompt requesting:<br/>1. Critical Focus<br/>2. Schedule Highlights<br/>3. Quick Wins<br/>4. Prep Notes
-
-    Processor->>AI: processCall(prompt, systemInstruction, [])
-    activate AI
-    Note over AI: No file context for speed/cost
-    AI->>GeminiAPI: POST /v1beta/models/{model}:generateContent
-    GeminiAPI-->>AI: briefing markdown
-    AI-->>Processor: briefing content
-    deactivate AI
-
-    Processor->>Processor: Build briefing task
-    Note over Processor: Title: "📅 Daily Briefing: {date}"<br/>Description: AI-generated briefing<br/>Priority: P1<br/>Due: today
-
-    Processor->>Todoist: createTask(briefingTask)
-    activate Todoist
-    Todoist->>TodoistAPI: POST /rest/v2/tasks
-    TodoistAPI-->>Todoist: task created
-    Todoist-->>Processor: success
-    deactivate Todoist
-
-    Processor-->>User: Complete
-    deactivate Processor
-```
-
-### Key Details:
-- **Trigger**: Time-driven, daily in early morning (suggested 6-7 AM)
-- **Data Sources**:
-  - Today's calendar events
-  - Tasks: today, overdue, or P1 priority
-- **AI Analysis**: No file context (faster, lower cost)
-- **Briefing Structure**:
-  1. **🛑 Critical Focus**: 1-2 absolute must-do items
-  2. **🗓️ Schedule Highlights**: Timeline with conflict flags
-  3. **⚡ Quick Wins**: Tasks doable in 15 minutes
-  4. **🧠 Prep Notes**: Meetings lacking preparation/agenda
-- **Delivery**: Created as P1 Todoist task due today
-- **Format**: Markdown for readability
-- **Purpose**: Executive-style daily overview for strategic focus
