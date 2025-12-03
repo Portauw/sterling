@@ -55,7 +55,6 @@ An intelligent automation system that orchestrates your life by integrating Goog
     *   `enrichTodoistTasks` (every 10 mins) - Flow 2
     *   `processContextData` (every 5 mins) - Flow 4
     *   `processCalendarItems` (daily 6-7 AM) - Flow 3
-    *   `generateDailyBriefing` (daily 6-7 AM) - Flow 8
     *   `enrichTodaysTasksForLabel('prepare_jit')` (daily 7-8 AM) - Flow 6
     *   `aiFileManagement` (manual or weekly maintenance) - Flow 7
 
@@ -74,7 +73,6 @@ This document provides comprehensive visual documentation of all data flows in t
 - [Flow 5: Data & State Management](#flow-5-data--state-management)
 - [Flow 6: Just-In-Time Task Preparation](#flow-6-just-in-time-task-preparation)
 - [Flow 7: AI File Management](#flow-7-ai-file-management)
-- [Flow 8: Daily Briefing Generation](#flow-8-daily-briefing-generation)
 
 ---
 
@@ -134,7 +132,7 @@ graph TB
 | Component | Responsibility | Key Methods |
 |-----------|---------------|-------------|
 | **Main.js** | Entry point, configuration initialization | `main()` |
-| **Processor.js** | Central orchestrator for all workflows | `enrichTodoistTasks()`, `processGoogleTasks()`, `processCalendarItems()`, `processContextData()`, `enrichTodaysTasksForLabel()`, `aiFileManagement()`, `generateDailyBriefing()` |
+| **Processor.js** | Central orchestrator for all workflows | `enrichTodoistTasks()`, `processGoogleTasks()`, `processCalendarItems()`, `processContextData()`, `enrichTodaysTasksForLabel()`, `aiFileManagement()` |
 | **Todoist.js** | Todoist API integration, task & comment management | `createTask()`, `getUpdatedTasks()`, `createComment()`, `getTasksByFilter()`, `deleteComments()` |
 | **GoogleTask.js** | Google Tasks API integration | `listTaskLists()`, `markGoogleTasksDone()` |
 | **AI.js** | Gemini AI client with file upload, caching, retry logic | `processCall()`, `uploadFile()`, `updateOrCreateCache()`, `getFiles()`, `deleteFile()` |
@@ -778,8 +776,7 @@ graph TB
   processCalendarItems,      // Flow 3: Calendar Event Processing
   processContextData,        // Flow 4: Context Data Update
   enrichTodaysTasksForLabel, // Flow 6: Just-In-Time Task Preparation
-  aiFileManagement,          // Flow 7: AI File Management
-  generateDailyBriefing      // Flow 8: Daily Briefing Generation
+  aiFileManagement           // Flow 7: AI File Management
 }
 ```
 
@@ -942,80 +939,3 @@ sequenceDiagram
 - **Logging**: Detailed logs of file counts and deletions
 - **Use Case**: Prevents storage bloat from repeated file uploads with same name
 - **Safety**: Only deletes from Gemini API, doesn't affect Drive files
-
----
-
-## Flow 8: Daily Briefing Generation
-
-This flow generates an AI-powered daily briefing task summarizing the day's events and priorities.
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Processor
-    participant Calendar
-    participant Todoist
-    participant AI
-    participant CalendarAPI
-    participant TodoistAPI
-    participant GeminiAPI
-
-    User->>Processor: generateDailyBriefing()
-    activate Processor
-
-    Processor->>Calendar: getEventsForDate(calendarId, today)
-    activate Calendar
-    Calendar->>CalendarAPI: CalendarApp.getEventsForDay(today)
-    CalendarAPI-->>Calendar: events[]
-    Calendar-->>Processor: {success, events[]}
-    deactivate Calendar
-
-    Processor->>Todoist: getTasksByFilter("today | overdue | p1")
-    activate Todoist
-    Todoist->>TodoistAPI: GET /rest/v2/tasks?filter={filter}
-    TodoistAPI-->>Todoist: tasks[]
-    Todoist-->>Processor: tasks[]
-    deactivate Todoist
-
-    Processor->>Processor: Format data for AI
-    Note over Processor: Extract: content, description,<br/>priority, due date from tasks<br/>All event data from calendar
-
-    Processor->>Processor: Build briefing prompt
-    Note over Processor: Structured prompt requesting:<br/>1. Critical Focus<br/>2. Schedule Highlights<br/>3. Quick Wins<br/>4. Prep Notes
-
-    Processor->>AI: processCall(prompt, systemInstruction, [])
-    activate AI
-    Note over AI: No file context for speed/cost
-    AI->>GeminiAPI: POST /v1beta/models/{model}:generateContent
-    GeminiAPI-->>AI: briefing markdown
-    AI-->>Processor: briefing content
-    deactivate AI
-
-    Processor->>Processor: Build briefing task
-    Note over Processor: Title: "📅 Daily Briefing: {date}"<br/>Description: AI-generated briefing<br/>Priority: P1<br/>Due: today
-
-    Processor->>Todoist: createTask(briefingTask)
-    activate Todoist
-    Todoist->>TodoistAPI: POST /rest/v2/tasks
-    TodoistAPI-->>Todoist: task created
-    Todoist-->>Processor: success
-    deactivate Todoist
-
-    Processor-->>User: Complete
-    deactivate Processor
-```
-
-### Key Details:
-- **Trigger**: Time-driven, daily in early morning (suggested 6-7 AM)
-- **Data Sources**:
-  - Today's calendar events
-  - Tasks: today, overdue, or P1 priority
-- **AI Analysis**: No file context (faster, lower cost)
-- **Briefing Structure**:
-  1. **🛑 Critical Focus**: 1-2 absolute must-do items
-  2. **🗓️ Schedule Highlights**: Timeline with conflict flags
-  3. **⚡ Quick Wins**: Tasks doable in 15 minutes
-  4. **🧠 Prep Notes**: Meetings lacking preparation/agenda
-- **Delivery**: Created as P1 Todoist task due today
-- **Format**: Markdown for readability
-- **Purpose**: Executive-style daily overview for strategic focus

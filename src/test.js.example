@@ -40,36 +40,3 @@ function test() {
   // processor.enrichTodoistTasks();
   // processor.processCalendarItems();
 }
-
-/**
- * Quick Wins Summary - Analyze inbox for 2-minute tasks
- * This function scans your Todoist inbox and identifies tasks that can be
- * completed in less than 2 minutes. It creates a summary scheduled for 9 AM.
- *
- * To schedule this to run daily:
- * 1. In Apps Script Editor, go to Triggers (clock icon on left)
- * 2. Click "+ Add Trigger"
- * 3. Choose function: quickWinsSummary
- * 4. Choose event source: Time-driven
- * 5. Select type: Day timer
- * 6. Select time: 8:00 AM - 9:00 AM (runs before 9 AM delivery)
- */
-function quickWinsSummary() {
-  const config = {
-    gTaskListId: "YOUR_GOOGLE_TASK_LIST_ID",
-    calendarId: "YOUR_CALENDAR_ID",
-    geminiApiKey: "YOUR_GEMINI_API_KEY",
-    geminiModel: "gemini-1.5-pro-latest",
-    todoistApiKey: "YOUR_TODOIST_API_KEY",
-    label: "AI",
-    todoistProjectId: "YOUR_TODOIST_PROJECT_ID",
-    promptInstructions: {
-      agents_prompt: "YOUR_AGENTS_PROMPT_FILE_ID",
-      calendar_instructions_prompt: "YOUR_CALENDAR_INSTRUCTIONS_FILE_ID"
-    },
-    driveFolders: [] // Context files not needed for quick wins
-  };
-
-  const processor = main(config);
-  processor.generateQuickWinsSummary();
-}
