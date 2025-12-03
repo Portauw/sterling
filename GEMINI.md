@@ -1,0 +1,1 @@
+Always start with the "AGENTS.md" file.
