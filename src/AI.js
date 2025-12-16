@@ -1,8 +1,6 @@
 const AI = (function ({
   geminiApiKey,
-  geminiModel,
-  cacheTtl = '600s',
-  AGENTS_PROMPTS
+  geminiModel
 }) {
 
   // API Constants
@@ -26,17 +24,16 @@ const AI = (function ({
     intervalSeconds: 30
   };
 
-  const SEARCH_TOOL = 
-      {
-        "google_search": {}
-      };
+  const SEARCH_TOOL =
+  {
+    "google_search": {}
+  };
   const URL_TOOL =
-      {
-        "url_context": {}
-      }
+  {
+    "url_context": {}
+  }
 
-
-  function deleteFile(fileId){
+  function deleteFile(fileId) {
     const params = {
       contentType: 'application/json',
       muteHttpExceptions: true,
@@ -66,15 +63,6 @@ const AI = (function ({
     return matchingFiles.length;
   }
 
-  /**
-   * Gets a file stored in Gemini.
-   */
-  function getFile(fileId) {
-    const url = `${API.file(fileId)}?key=${geminiApiKey}`;
-    const res = UrlFetchApp.fetch(url).getContentText();
-    return res;
-  }
-
   function getFiles(nextPageToken) {
     var url = `${API.files()}?key=${geminiApiKey}&pageSize=100`;
     const params = {
@@ -91,120 +79,6 @@ const AI = (function ({
       files = files.concat(getFiles(res.nextPageToken));
     }
     return files;
-  }
-
-  function updateTtlCache(cacheDisplayName) {
-    var cache = getCache(cacheDisplayName);
-    if (cache) {
-      var url = `${API.file(cache.name)}?key=${geminiApiKey}`;
-      var params = {
-        contentType: 'application/json',
-        muteHttpExceptions: true,
-        method: 'patch',
-        payload: JSON.stringify({ ttl: cacheTtl })
-      }
-      var result = UrlFetchApp.fetch(url, params);
-      logger.info(result.getResponseCode() == 200 ? `Succesfully updated cache TTL ${cache.displayName}` : `Error during updating cache TTL ${cache.displayName}`);
-      PropertiesUtil.setPropertyValue(cacheDisplayName, getCache(cacheDisplayName));
-    } else {
-      // When the cache is not found we force it to update it.
-      updateOrCreateCache(cacheDisplayName);
-    }
-  }
-
-  function updateOrCreateCache(cacheDisplayName) {
-    // Gets all the files now since in the context of ITP_CACHE
-    var fileMetaPropertyKeys = PropertiesUtil.getFilesPropertyValue();
-    var parts = [];
-    for (const key of fileMetaPropertyKeys) {
-      var fileMeta = PropertiesUtil.getScriptPropertyObject(key);
-      //logger.info(fileMeta);
-      if (fileMeta) {
-        if (!fileMeta.uri) {
-          logger.warn(`Filemeta for ${key} incorrect, ignoring`);
-          PropertiesUtil.removeProperty(key);
-        } else {
-          const part = { fileData: { mimeType: fileMeta.mimeType, fileUri: fileMeta.uri } };
-          parts.push(part);
-        }
-      } else {
-        logger.warn(`Filemeta not found for key ${key}`);
-        fileMetaPropertyKeys.splice(fileMetaPropertyKeys.indexOf(key), 1);
-        PropertiesUtil.saveFilesPropertyValue(fileMetaPropertyKeys);
-      }
-    }
-
-    var cacheItem = {
-      displayName: cacheDisplayName,
-      model: `models/${geminiModel}`,
-      contents: [
-        {
-          parts: parts,
-          role: 'user'
-        },
-      ],
-      systemInstruction:
-      {
-        parts:
-          [
-            {
-              "text": AGENTS_PROMPTS
-            }
-          ]
-      },
-      ttl: cacheTtl
-    };
-
-    const params = {
-      contentType: 'application/json',
-      muteHttpExceptions: true,
-      method: 'POST',
-      payload: JSON.stringify(cacheItem)
-    }
-    var response = JSON.parse(UrlFetchApp.fetch(`${API.caches()}?key=${geminiApiKey}`, params));
-    if (response.error) {
-      logger.error(JSON.stringify(response));
-      PropertiesUtil.removeProperty(cacheDisplayName);
-    } else {
-      logger.info(`Succesfully updated / created cache ${cacheDisplayName}`);
-      PropertiesUtil.setPropertyValue(cacheDisplayName, response);
-    }
-  }
-
-  function removeCache(cacheName) {
-    UrlFetchApp.fetch(`${API.file(cacheName)}?key=${geminiApiKey}`, { method: 'delete' });
-    logger.info(`Removed cache ${cacheName}`);
-  }
-
-  function getCache(cacheDisplayName) {
-    var cache = PropertiesUtil.getOptionalCache(cacheDisplayName);
-    if (cache) {
-      var url = `${API.file(cache.name)}?key=${geminiApiKey}`;
-      var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true, contentType: 'application/json', method: 'GET' });
-      if (response.getResponseCode() == 200) {
-        return JSON.parse(response.getContentText());
-      } else {
-        logger.warn(`Cache ${cacheDisplayName} not found in Gemini.`);
-        return null;
-      }
-    } else {
-      logger.info(`Cache ${cacheDisplayName} not found in properties`);
-      return null;
-    }
-
-
-  }
-
-  function getAllCaches() {
-    return JSON.parse(UrlFetchApp.fetch(`${API.caches()}?key=${geminiApiKey}`));
-  }
-
-  function uploadFiles(files) {
-    var result = [];
-    for (const file of files) {
-      result.push(uploadFile(file.fileName, file.fileBlob));
-    }
-    return result;
   }
 
   function uploadFile(fileName, fileBlob) {
@@ -251,29 +125,23 @@ const AI = (function ({
     };
   }
 
-  function processCall(contents, systemInstruction, files = [], tools = [], functions = [], tryCount = 0){
+  function processCall(contents, systemInstruction, files = [], tryCount = 0) {
     var params = {
       method: "POST",
       contentType: 'application/json',
       muteHttpExceptions: true,
     };
 
-    
+
     if (files && files.length > 0) {
       contents.unshift(buildFileParts(files));
     } else {
       logger.info("No files provided.");
     }
 
-    if (!tools || tools.length == 0) {
-      tools = []
-    }
     params.payload = JSON.stringify({
       contents: contents,
-      // ...(cacheId && {cachedContent: cacheId}),
-      // tools:  [...tools, ...functions],
-      // DISABLED TOOL CALLING SINCE NOT REALLY WORKING CORRECTLY
-      // tools:  functions,
+      tools: [SEARCH_TOOL, URL_TOOL],
       systemInstruction:
       {
         parts:
@@ -339,34 +207,17 @@ const AI = (function ({
         } else {
           logger.warn(`Error during processing, trying again in ${RETRY_CONFIG.intervalSeconds} seconds, error: ${errorMessage}`);
           Utilities.sleep(RETRY_CONFIG.intervalSeconds * 1000);
-          return processCall(contents, systemInstruction, files, tools, functions, tryCount + 1);
+          return processCall(contents, systemInstruction, files, tryCount + 1);
         }
       }
       var returnValue = '';
       try {
         returnValue = result.candidates[0].content.parts.map((part) => part.text);
-      }catch(err){
+      } catch (err) {
         logger.error(`Error reading result ${JSON.stringify(result)}`);
       }
-      if (!returnValue[0]){
-        // check if it is a function call and take the first one.
-        var functionResults = result.candidates[0].content.parts.map((part) => part.functionCall);
-        logger.info(`Function calls detected: ${JSON.stringify(functionResults)}`);
-        if (functionResults.length > 2){
-          logger.warn(`Too many function calls being triggered. ${functionResults.length} `);
-          functionResults = functionResults.slice(0, 2);
-        }
-        for (const functionCall of functionResults){
-          const functionName = functionCall.name;
-          logger.info(`Triggered function call ${functionName}`);
-          const args = functionCall.args;
-          const functionDef = functions[0].functionDeclarations.find(fd => fd[functionName]);
-          // This will only work when the args of the function has only 1 parameter since we do Object.values(args)[0].
-          const functionCallResult = functionDef[functionName](Object.values(args)[0]);
-          contents.push(buildTextContent('user', JSON.stringify(functionCallResult)));
-        }
-        return processCall(contents, systemInstruction, files, tools, functions, 0);
-      }else {
+
+      if (returnValue[0]) {
         logger.info(`Text: ${returnValue}`);
       }
       return returnValue;
@@ -379,20 +230,11 @@ const AI = (function ({
   return {
     processCall,
     uploadFile,
-    uploadFiles,
-    getFile,
     getFiles,
     deleteFile,
     deleteFileByDisplayName,
-    updateOrCreateCache,
-    updateTtlCache,
     buildTextContent,
-    buildFileParts,
-    getCache,
-    getAllCaches,
-    removeCache, 
-    SEARCH_TOOL, 
-    URL_TOOL
+    buildFileParts
   }
 })
 

@@ -45,14 +45,24 @@ const Todoist = (function ({ todoistApiKey, label }) {
       var description = link ? '[' + link.description + '](' + link.url + ')' + (task.description || '') : (task.description || '');
       
       // Destructure to separate special handling fields from the rest
-      const { title, link: _, description: __, labels = [], due_date, project_id, ...otherProps } = task;
+      const { title, link: _, description: __, labels = [], due_date, project_id, duration, duration_unit, ...otherProps } = task;
+
+      // Normalize duration: convert array to integer
+      const normalizedDuration = duration
+        ? (Array.isArray(duration) ? parseInt(duration[0]) : parseInt(duration))
+        : null;
 
       params.payload = JSON.stringify({
-        ...otherProps, // Spread remaining properties (e.g. duration, priority)
+        ...otherProps, // Spread remaining properties (e.g. priority)
         content: title,
         description: description,
         labels: [...labels, label],
         ...(due_date && {due_date: due_date}),
+        // Only include duration if BOTH duration and duration_unit are valid
+        ...(normalizedDuration && duration_unit && {
+          duration: normalizedDuration,
+          duration_unit
+        }),
         project_id: project_id
       });
 
@@ -99,23 +109,6 @@ const Todoist = (function ({ todoistApiKey, label }) {
       return JSON.parse(result);
     } catch (err) {
       logger.error(`Failed to get task ${taskId} with error ${err.message}`);
-      return false;
-    }
-  }
-
-  function getProjects() {
-    var params = {
-      method: "GET",
-      contentType: 'application/json',
-      headers: { Authorization: "Bearer " + todoistApiKey },
-      muteHttpExceptions: false
-    };
-    var url = API.projects();
-    try {
-      var result = UrlFetchApp.fetch(url, params);
-      return JSON.parse(result);
-    } catch (err) {
-      logger.error(`Failed to get projects with error ${err.message}`);
       return false;
     }
   }
@@ -245,14 +238,12 @@ const Todoist = (function ({ todoistApiKey, label }) {
 
   }
   return {
-    getTask,
     createTask,
     createComment,
     deleteComments,
     updateTask,
     getCommentsForTask,
     getUpdatedTasks,
-    getTasksByFilter,
-    getProjects
+    getTasksByFilter
   }
 })// test

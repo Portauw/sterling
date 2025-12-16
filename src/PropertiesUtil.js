@@ -54,24 +54,4 @@ class PropertiesUtil {
       return false;
     }
   }
-
-  static cleanUpProperties(){
-    const items = PropertiesService.getScriptProperties().getProperties();
-    for (const item in items) { 
-      if (item === PROPERTY_KEYS.FILE_PROPERTIES_KEY || 
-      item === PROPERTY_KEYS.TODOIST_LAST_SYNC_TOKEN_KEY){
-        log(`Not a file key,`);
-      } else {
-        try {
-          const expired = isFileExpired(item);
-          if (expired){
-              log(`${item} expired? ${expired}`);
-             // PropertiesUtil.removeProperty(item)
-          }
-        }catch (err){
-          log(`Error in ${item} with ${items[item]}`);
-        }
-      }
-    }
-  }
 }

@@ -67,7 +67,17 @@ var Telemetry = (function() {
   return {
     init: (newConfig) => {
       config = { ...config, ...newConfig }; // Merge new config
-      logToConsole('INFO', 'Telemetry', 'Telemetry initialized with new configuration.', config);
+
+      // Create safe summary instead of logging full config (defense-in-depth)
+      const configSummary = {
+        hasGeminiApiKey: !!config.geminiApiKey,
+        hasTodoistApiKey: !!config.todoistApiKey,
+        hasAdminTodoistProjectId: !!config.adminTodoistProjectId,
+        env: config.env,
+        configuredModules: Object.keys(config).length
+      };
+
+      logToConsole('INFO', 'Telemetry', 'Telemetry initialized with new configuration.', configSummary);
     },
     getLogger: (moduleName) => ({
       debug: (msg, data) => logToConsole('DEBUG', moduleName, msg, data),

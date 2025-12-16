@@ -2,6 +2,12 @@
 
 An intelligent automation system that orchestrates your life by integrating Google Tasks, Todoist, Google Calendar, and Gemini AI.
 
+## Documentation
+
+- **[PRODUCTION_GUIDE.md](./PRODUCTION_GUIDE.md)** - Complete production deployment guide with trigger schedules, API costs, vault optimization, and monitoring
+- **[AGENTS.md](./AGENTS.md)** - Comprehensive technical documentation and implementation details
+- **[README.md](./README.md)** (this file) - System architecture and flow documentation
+
 ## Setup & Installation
 
 ### Prerequisites
@@ -50,13 +56,23 @@ An intelligent automation system that orchestrates your life by integrating Goog
     *   `driveFolders`: Array of Google Drive folder IDs to use for AI context.
 
 3.  **Deploy Triggers**
-    Open the script in the Google Apps Script editor (`clasp open`) and set up time-driven triggers for the `Processor` functions:
-    *   `processGoogleTasks` (every 10 mins) - Flow 1
-    *   `enrichTodoistTasks` (every 10 mins) - Flow 2
-    *   `processContextData` (every 5 mins) - Flow 4
-    *   `processCalendarItems` (daily 6-7 AM) - Flow 3
-    *   `enrichTodaysTasksForLabel('prepare_jit')` (daily 7-8 AM) - Flow 6
-    *   `aiFileManagement` (manual or weekly maintenance) - Flow 7
+    Open the script in the Google Apps Script editor (`clasp open-script`) and set up time-driven triggers.
+
+    **See [PRODUCTION_GUIDE.md](./PRODUCTION_GUIDE.md) for complete trigger configuration, costs, and optimization.**
+
+    **Quick Reference - Core Triggers:**
+    *   `processContextData` (every 5 mins) - Smart vault sync (uploads only changed files)
+    *   `processGoogleTasks` (every 10 mins) - Google Tasks → Todoist sync
+    *   `enrichTodoistTasks` (every 10 mins) - AI task enrichment
+    *   `processCalendarItems` (daily 6-7 AM) - Meeting preparation tasks
+    *   `enrichTodaysTasksForLabel('prepare_jit')` (daily 7-8 AM) - Batch JIT enrichment
+
+    **Optional High-Value Triggers:**
+    *   `generateDailyBriefing` (daily 6-7 AM) - Executive summary task
+    *   `generateQuickWinsSummary` (daily 8-9 AM) - 2-minute task identification
+
+    **Maintenance:**
+    *   `aiFileManagement` (manual or weekly) - Cleanup duplicates
 
 ---
 
@@ -73,6 +89,8 @@ This document provides comprehensive visual documentation of all data flows in t
 - [Flow 5: Data & State Management](#flow-5-data--state-management)
 - [Flow 6: Just-In-Time Task Preparation](#flow-6-just-in-time-task-preparation)
 - [Flow 7: AI File Management](#flow-7-ai-file-management)
+- [Flow 8: Daily Briefing Generation](#flow-8-daily-briefing-generation)
+- [Flow 9: Quick Wins Summary](#flow-9-quick-wins-summary)
 
 ---
 
@@ -132,12 +150,12 @@ graph TB
 | Component | Responsibility | Key Methods |
 |-----------|---------------|-------------|
 | **Main.js** | Entry point, configuration initialization | `main()` |
-| **Processor.js** | Central orchestrator for all workflows | `enrichTodoistTasks()`, `processGoogleTasks()`, `processCalendarItems()`, `processContextData()`, `enrichTodaysTasksForLabel()`, `aiFileManagement()` |
-| **Todoist.js** | Todoist API integration, task & comment management | `createTask()`, `getUpdatedTasks()`, `createComment()`, `getTasksByFilter()`, `deleteComments()`, `updateTask()`, `getTask()`, `getProjects()` |
+| **Processor.js** | Central orchestrator for all workflows | `enrichTodoistTasks()`, `processGoogleTasks()`, `processCalendarItems()`, `processContextData()`, `enrichTodaysTasksForLabel()`, `aiFileManagement()`, `generateDailyBriefing()`, `generateQuickWinsSummary()` |
+| **Todoist.js** | Todoist API integration, task & comment management | `createTask()`, `getUpdatedTasks()`, `createComment()`, `getTasksByFilter()`, `deleteComments()`, `updateTask()` |
 | **GoogleTask.js** | Google Tasks API integration | `listTaskLists()`, `markGoogleTasksDone()` |
 | **AI.js** | Gemini AI client with file upload, caching, retry logic | `processCall()`, `uploadFile()`, `updateOrCreateCache()`, `getFiles()`, `deleteFile()`, `deleteFileByDisplayName()`, `buildTextContent()` |
 | **Calendar.js** | Google Calendar event management | `getEventsForDate()`, `findOpenSlot()`, `parseTimeString()` |
-| **Vault.js** | Google Drive file access and management | `getFiles()`, `getFile()`, `searchDrive()`, `getDriveTools()`, `wasUpdated()`, `getFileFunction()`, `getSearchFunction()` |
+| **Vault.js** | Google Drive file access and management | `getFiles()`, `getFile()`, `getDriveTools()`, `wasUpdated()`, `getFileFunction()` |
 | **PropertiesUtil.js** | Script properties management with expiration | `setPropertyValue()`, `getScriptPropertyObject()`, `isFileExpired()`, `getFilesPropertyValue()`, `saveFilesPropertyValue()` |
 | **Telemetry.js** | Structured logging and error tracking | `init()`, `getLogger()` (returns logger with `info()`, `error()`, `warn()`, `debug()`) |
 
@@ -294,7 +312,7 @@ sequenceDiagram
 
             alt Response contains functionCall
                 AI->>AI: Extract function name & args
-                AI->>Vault: Execute function (getFile/searchDrive)
+                AI->>Vault: Execute function (getFile)
                 Vault-->>AI: function result
                 AI->>AI: Add result to contents
                 AI->>GeminiAPI: POST again with function result
@@ -342,7 +360,7 @@ sequenceDiagram
   - System instruction from Drive file (agents_prompt)
   - All uploaded Drive files as context
   - Previous comments (maintaining conversation history)
-  - Drive function calling (getFile, searchDrive)
+  - Drive function calling (getFile)
 - **Sync Token**: Incremental sync to only process changed tasks
 - **Rate Limiting**: 10-second sleep between task enrichments
 - **Retry Logic**: AI calls retry up to 3 times with 15-second intervals
@@ -377,8 +395,11 @@ sequenceDiagram
     CalendarAPI-->>Calendar: events[]
 
     loop For each event
+        Calendar->>Calendar: Get guest list with organizer
+        Note over Calendar: getGuestList(true) includes organizer
+
         Calendar->>Calendar: Format event data (slimmed)
-        Note over Calendar: Extract: title, description,<br/>startTime, endTime, attendees, isAllDay<br/>Optional: location (if not empty), recurrence
+        Note over Calendar: Extract: title, description,<br/>startTime, endTime,<br/>attendees (incl. organizer), isAllDay<br/>Optional: location (if not empty), recurrence
 
         alt Event is recurring
             Calendar->>CalendarAPI: FullCalendar.Events.get(calendarId, eventId)
@@ -392,12 +413,16 @@ sequenceDiagram
     alt success && events.length > 0
         Processor->>Processor: filterEventsForProcessing(events)
         activate Processor
-        Note over Processor: Filter criteria:<br/>- Skip all-day events<br/>- Skip events outside work hours (7am-8pm)<br/>- Require 2+ attendees
+        Note over Processor: Filter criteria:<br/>- Skip all-day events<br/>- Skip events with no attendees<br/>- Skip solo events (only you as attendee)
 
         loop For each event
             Processor->>Processor: Apply filters
-            alt Fails filter check
-                Note over Processor: Log and skip event
+            alt Is all-day event
+                Note over Processor: Skip - no prep needed
+            else Has 0 or 1 attendees
+                Note over Processor: Skip - no attendees or solo event<br/>(attendees.length <= 1)
+            else Has 2+ attendees
+                Note over Processor: Include for processing
             end
         end
 
@@ -480,13 +505,13 @@ sequenceDiagram
 ### Key Details:
 - **Trigger**: Time-driven, daily between 6 AM and 7 AM
 - **Event Selection**: Today's events where user status is INVITED/MAYBE/YES/OWNER
-- **Smart Filtering** (Processor.js:163):
+- **Smart Filtering** (Processor.js:180):
   - Skips all-day events (no preparation needed)
-  - Skips events outside work hours (7am-8pm)
-  - Requires 2+ attendees (excludes personal/solo events)
+  - Skips events with ≤1 attendees (no attendees or solo events)
+  - Attendees list includes organizer via `getGuestList(true)`
   - Significantly reduces token usage by filtering before AI call
-- **Slimmed Event Data** (Calendar.js:168):
-  - Removed: `id` field (not needed for AI analysis)
+- **Slimmed Event Data** (Calendar.js:26):
+  - Includes organizer in attendees list using `getGuestList(true)`
   - Conditional: `location` only if non-empty
   - Kept: `title`, `description`, `startTime`, `endTime`, `attendees`, `isAllDay`, `recurrence`
   - Reduces token count per event by ~20-30%
@@ -777,7 +802,9 @@ graph TB
   processCalendarItems,      // Flow 3: Calendar Event Processing
   processContextData,        // Flow 4: Context Data Update
   enrichTodaysTasksForLabel, // Flow 6: Just-In-Time Task Preparation
-  aiFileManagement           // Flow 7: AI File Management
+  aiFileManagement,          // Flow 7: AI File Management
+  generateDailyBriefing,     // Generate daily briefing task
+  generateQuickWinsSummary   // Generate quick wins summary from inbox
 }
 ```
 
@@ -940,3 +967,214 @@ sequenceDiagram
 - **Logging**: Detailed logs of file counts and deletions
 - **Use Case**: Prevents storage bloat from repeated file uploads with same name
 - **Safety**: Only deletes from Gemini API, doesn't affect Drive files
+
+---
+
+## Flow 8: Daily Briefing Generation
+
+This flow generates a comprehensive daily briefing task that summarizes calendar events and tasks.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Processor
+    participant Calendar
+    participant Todoist
+    participant AI
+    participant CalendarAPI
+    participant TodoistAPI
+    participant GeminiAPI
+
+    User->>Processor: generateDailyBriefing()
+    activate Processor
+
+    Processor->>Calendar: getEventsForDate(calendarId, today)
+    activate Calendar
+    Calendar->>CalendarAPI: Get today's events
+    CalendarAPI-->>Calendar: events[]
+    Calendar-->>Processor: {success: true, events[]}
+    deactivate Calendar
+
+    Processor->>Todoist: getTasksByFilter("today | overdue | p1")
+    activate Todoist
+    Todoist->>TodoistAPI: GET /rest/v2/tasks?filter={filter}
+    TodoistAPI-->>Todoist: tasks[]
+    Todoist-->>Processor: tasks[]
+    deactivate Todoist
+
+    Processor->>Processor: Build prompt with events and tasks
+    Note over Processor: Creates structured JSON with:<br/>- Today's date<br/>- Calendar events<br/>- Tasks (today, overdue, P1)
+
+    Processor->>AI: processCall(prompt, systemInstruction)
+    activate AI
+    AI->>GeminiAPI: POST /v1beta/models/{model}:generateContent
+    Note over AI,GeminiAPI: Request briefing in Markdown:<br/>- Critical Focus<br/>- Schedule Highlights<br/>- Quick Wins<br/>- Prep Notes
+    GeminiAPI-->>AI: briefing content (Markdown)
+    AI-->>Processor: briefing text
+    deactivate AI
+
+    Processor->>Processor: Build briefing task
+    Note over Processor: Title: "📅 Daily Briefing: {date}"<br/>Description: AI-generated content<br/>Priority: P1 (4)<br/>Due: today
+
+    Processor->>Todoist: createTask(briefingTask)
+    activate Todoist
+    Todoist->>TodoistAPI: POST /rest/v2/tasks
+    TodoistAPI-->>Todoist: task created
+    Todoist-->>Processor: success
+    deactivate Todoist
+
+    Processor-->>User: Success
+    deactivate Processor
+```
+
+### Key Details:
+- **Trigger**: Manual or scheduled (recommended: daily 6-7 AM)
+- **Data Sources**:
+  - Calendar events for today
+  - Tasks due today, overdue, or priority 1
+- **AI Analysis**:
+  - Identifies critical focus items (1-2 must-dos)
+  - Highlights schedule with tight transitions/conflicts
+  - Lists quick wins (15-min tasks)
+  - Notes meetings lacking preparation or agenda
+- **Output**: Single P1 Todoist task with Markdown briefing
+- **Purpose**: Executive summary to start the day with clarity
+
+---
+
+## Flow 9: Quick Wins Summary
+
+This flow analyzes inbox tasks to identify quick 2-minute tasks and creates a summary.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Processor
+    participant Todoist
+    participant AI
+    participant TodoistAPI
+    participant GeminiAPI
+
+    User->>Processor: generateQuickWinsSummary()
+    activate Processor
+
+    Processor->>Todoist: getTasksByFilter("#Inbox")
+    activate Todoist
+    Todoist->>TodoistAPI: GET /rest/v2/tasks?filter=%23Inbox
+    TodoistAPI-->>Todoist: inboxTasks[]
+    Todoist-->>Processor: tasks[]
+    deactivate Todoist
+
+    alt No inbox tasks
+        Note over Processor: Log and return false
+        Processor-->>User: No tasks found
+    end
+
+    Processor->>Processor: Build analysis prompt
+    Note over Processor: Include task data:<br/>- id, content, description<br/>- priority, labels
+
+    Processor->>AI: processCall(analysisPrompt, systemInstruction)
+    activate AI
+    AI->>GeminiAPI: POST /v1beta/models/{model}:generateContent
+    Note over AI,GeminiAPI: Request JSON analysis:<br/>- Identify < 2 min tasks<br/>- Provide reason for each<br/>- Generate motivational summary
+    GeminiAPI-->>AI: JSON response
+    AI-->>Processor: analysis JSON
+    deactivate AI
+
+    Processor->>Processor: extractJsonFromResponse(response)
+    Note over Processor: Parse: quick_tasks[], summary
+
+    alt No quick tasks identified
+        Note over Processor: Log and return false
+        Processor-->>User: No quick wins found
+    end
+
+    Processor->>Processor: Build summary task
+    Note over Processor: Title: "⚡ Quick Wins Summary: {count} tasks"<br/>Description: Formatted list with reasons<br/>Priority: P2 (3)<br/>Due: today 9:00 AM<br/>Duration: 15 minutes
+
+    Processor->>Todoist: createTask(summaryTask)
+    activate Todoist
+    Todoist->>TodoistAPI: POST /rest/v2/tasks
+    TodoistAPI-->>Todoist: task created
+    Todoist-->>Processor: success
+    deactivate Todoist
+
+    Processor-->>User: Success
+    deactivate Processor
+```
+
+### Key Details:
+- **Trigger**: Manual or scheduled (recommended: daily 6-7 AM)
+- **Target**: Tasks in #Inbox project
+- **AI Analysis**:
+  - Evaluates complexity and execution time
+  - Conservative assessment (only truly quick tasks)
+  - Common 2-minute tasks: quick emails, simple decisions, short calls, lookups
+  - Excludes: vague tasks, research, coordination, creative work
+- **Output Format**: P2 task scheduled at 9 AM with:
+  - Numbered list of quick wins
+  - Reason for each selection
+  - Motivational summary (2-3 sentences)
+- **Duration**: 15 minutes allocated for review
+- **Purpose**: Batch quick tasks for momentum and productivity
+
+---
+
+## Vault Context & Performance
+
+### Smart Context Sync
+
+The `processContextData()` function implements intelligent caching to keep your AI context fresh while minimizing API usage:
+
+**How it works:**
+```javascript
+// Only uploads files that have actually changed
+if (VaultClient.wasUpdated(file) || PropertiesUtil.isFileExpired(file.getName()) || forceUpdate) {
+  var fileResult = AiClient.uploadFile(file.getName(), file.getBlob());
+}
+```
+
+**Current vault statistics:**
+- 211 markdown files across 5 folders
+- 1.07 MB total (~267K tokens for Gemini context)
+- 2.4% daily change rate (~5 files/day)
+- Smart sync: ~5-7 uploads/day despite 288 metadata checks
+
+**Result:** Near-real-time context freshness with minimal API costs.
+
+### Folder Structure
+
+| Folder | Purpose | Files | Update Frequency |
+|--------|---------|-------|------------------|
+| **People** | Relationship context | 116 files (63%) | High (2.6% daily) |
+| **Meetings** | Meeting notes & context | 33 files (16%) | High (3.0% daily) |
+| **Brave Penguin** | Project context | 21 files (6%) | Moderate (2.7% daily) |
+| **Initiatives** | Strategic context | 13 files (5%) | Low (1.1% daily) |
+| **General** | Reference docs | 28 files (9%) | Low (1.0% daily) |
+
+**For complete vault optimization guide, API costs, and production best practices, see [PRODUCTION_GUIDE.md](./PRODUCTION_GUIDE.md).**
+
+---
+
+## Production Deployment
+
+For production deployment, refer to **[PRODUCTION_GUIDE.md](./PRODUCTION_GUIDE.md)** which includes:
+
+- Complete trigger schedule with timing rationale
+- API cost estimation and optimization strategies
+- Vault context health monitoring
+- Gemini Flash vs. Pro cost comparison (88% savings)
+- Troubleshooting common issues
+- Weekly and monthly maintenance checklists
+- Production deployment checklist
+
+**Quick Stats:**
+- Estimated daily cost: $3.68/day with Gemini Pro, $0.44/day with Gemini Flash
+- Total API calls/day: ~16 Gemini calls, 288 vault checks, 144 task syncs
+- Vault refresh: Every 5 minutes (smart upload on change only)
+
+---
+
+## License & Contributing
+
+This is a personal automation system. Feel free to fork and adapt for your own use.

@@ -29,3 +29,13 @@ Thomas Vackier.md
 ai-assistant/
 .claude/
 .clauderc
+
+# Node.js dependencies and tooling
+node_modules/
+package.json
+package-lock.json
+knip.json
+analyze-dead-code.js
+
+# Documentation
+docs/

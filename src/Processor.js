@@ -36,11 +36,9 @@ const Processor = (function ({
     VaultClient.getFile(promptInstructions.agents_prompt);
   const CALENDAR_INSTRUCTIONS_PROMPT =
     VaultClient.getFile(promptInstructions.calendar_instructions_prompt);
-  const DRIVE_FUNCTIONS = VaultClient.getDriveTools([VaultClient.getFileFunction()]);
   const AiClient = AI(
     { geminiApiKey: geminiApiKey,
-      geminiModel: geminiModel,
-      AGENTS_PROMPTS
+      geminiModel: geminiModel
     });
   const CalendarClient = Calendar({ defaultCalendarId: calendarId });
 
@@ -99,8 +97,7 @@ const Processor = (function ({
     }
     const systemInstruction = AGENTS_PROMPTS;
     const files = AiClient.getFiles();
-    //const tools = [AiClient.SEARCH_TOOL, AiClient.URL_TOOL];
-    var aiResult = AiClient.processCall(content, systemInstruction, files, [], DRIVE_FUNCTIONS, 0);
+    var aiResult = AiClient.processCall(content, systemInstruction, files);
     aiResult.forEach((item) => {
       TodoistClient.createComment(task.id, `${AI_RESULT_PREFIX} ${item}`);
     });
@@ -187,12 +184,11 @@ const Processor = (function ({
         return false;
       }
 
-      // Only process events with attendees (more than just the user)
-      if (!event.attendees || event.attendees.length <= 0) {
-        logger.info(`Skipping event with no other attendees: ${event.title}`);
+      // Skip events with no attendees
+      if (!event.attendees || event.attendees.length <= 1) {
+        logger.info(`Skipping event with no attendees: ${event.title}`);
         return false;
       }
-
       return true;
     });
 
@@ -209,10 +205,7 @@ const Processor = (function ({
       AiClient.buildTextContent('user', CALENDAR_INSTRUCTIONS_PROMPT)
     ];
     const files = AiClient.getFiles();
-    // const tools = [AiClient.SEARCH_TOOL, AiClient.URL_TOOL];
-    // const functions = DRIVE_FUNCTIONS;
-    // Not passing the tools or functions along since not needed for this.
-    var result = extractJsonFromResponse(AiClient.processCall(contents, systemInstruction, files, [], [], 0)[0]);
+    var result = extractJsonFromResponse(AiClient.processCall(contents, systemInstruction, files)[0]);
     logger.info(`Done preparing events.`);
     return result;
   }
