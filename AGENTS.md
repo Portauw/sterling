@@ -18,7 +18,7 @@ For detailed information on type of data, files, update frequency look at the @c
 
 *   **`Main.js`:** Entry point that initializes the `Processor` with configuration parameters (API keys, folder IDs, etc.)
 *   **`Processor.js`:** Central orchestrator coordinating all services and implementing core business logic
-*   **`AI.js`:** Gemini API client handling file uploads, content generation, caching, and retry logic (3 retries with 30-second intervals)
+*   **`AI.js`:** Gemini API client handling file uploads, content generation, and retry logic (3 retries with 30-second intervals)
 *   **`Todoist.js`:** Todoist API client managing tasks and comments with sync token tracking
 *   **`Calendar.js`:** Google Calendar API client managing calendar events and date processing
 *   **`GoogleTask.js`:** Google Tasks API client with interval-based processing
@@ -76,7 +76,7 @@ const ModuleName = (function ({ config }) {
 4. **Calendar Processing:** Events analyzed for preparation task creation
 
 ### Key Implementation Details
-*   Properties Service used for caching and sync token management
+*   Properties Service used for file metadata and sync token management
 *   File expiration tracking prevents unnecessary AI uploads
 *   Calendar preparation tasks scheduled in open slots based on AI-estimated duration (default 45 mins), with multi-tier fallback strategy:
     *   Strict scheduling (avoid all events)

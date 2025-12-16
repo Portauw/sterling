@@ -4,7 +4,6 @@ An intelligent automation system that orchestrates your life by integrating Goog
 
 ## Documentation
 
-- **[PRODUCTION_GUIDE.md](./PRODUCTION_GUIDE.md)** - Complete production deployment guide with trigger schedules, API costs, vault optimization, and monitoring
 - **[AGENTS.md](./AGENTS.md)** - Comprehensive technical documentation and implementation details
 - **[README.md](./README.md)** (this file) - System architecture and flow documentation
 
@@ -58,9 +57,7 @@ An intelligent automation system that orchestrates your life by integrating Goog
 3.  **Deploy Triggers**
     Open the script in the Google Apps Script editor (`clasp open-script`) and set up time-driven triggers.
 
-    **See [PRODUCTION_GUIDE.md](./PRODUCTION_GUIDE.md) for complete trigger configuration, costs, and optimization.**
-
-    **Quick Reference - Core Triggers:**
+    **Core Triggers:**
     *   `processContextData` (every 5 mins) - Smart vault sync (uploads only changed files)
     *   `processGoogleTasks` (every 10 mins) - Google Tasks → Todoist sync
     *   `enrichTodoistTasks` (every 10 mins) - AI task enrichment
@@ -153,9 +150,9 @@ graph TB
 | **Processor.js** | Central orchestrator for all workflows | `enrichTodoistTasks()`, `processGoogleTasks()`, `processCalendarItems()`, `processContextData()`, `enrichTodaysTasksForLabel()`, `aiFileManagement()`, `generateDailyBriefing()`, `generateQuickWinsSummary()` |
 | **Todoist.js** | Todoist API integration, task & comment management | `createTask()`, `getUpdatedTasks()`, `createComment()`, `getTasksByFilter()`, `deleteComments()`, `updateTask()` |
 | **GoogleTask.js** | Google Tasks API integration | `listTaskLists()`, `markGoogleTasksDone()` |
-| **AI.js** | Gemini AI client with file upload, caching, retry logic | `processCall()`, `uploadFile()`, `updateOrCreateCache()`, `getFiles()`, `deleteFile()`, `deleteFileByDisplayName()`, `buildTextContent()` |
+| **AI.js** | Gemini AI client with file upload and retry logic | `processCall()`, `uploadFile()`, `getFiles()`, `deleteFile()`, `deleteFileByDisplayName()`, `buildTextContent()`, `buildFileParts()` |
 | **Calendar.js** | Google Calendar event management | `getEventsForDate()`, `findOpenSlot()`, `parseTimeString()` |
-| **Vault.js** | Google Drive file access and management | `getFiles()`, `getFile()`, `getDriveTools()`, `wasUpdated()`, `getFileFunction()` |
+| **Vault.js** | Google Drive file access and management | `getFiles()`, `getFile()`, `wasUpdated()` |
 | **PropertiesUtil.js** | Script properties management with expiration | `setPropertyValue()`, `getScriptPropertyObject()`, `isFileExpired()`, `getFilesPropertyValue()`, `saveFilesPropertyValue()` |
 | **Telemetry.js** | Structured logging and error tracking | `init()`, `getLogger()` (returns logger with `info()`, `error()`, `warn()`, `debug()`) |
 
@@ -298,29 +295,17 @@ sequenceDiagram
 
             AI-->>Processor: files[] metadata
 
-            Processor->>Vault: getDriveTools()
-            Vault-->>Processor: DRIVE_FUNCTIONS
-
-            Processor->>AI: processCall(content, systemInstruction, files, [], functions)
+            Processor->>AI: processCall(content, systemInstruction, files)
             activate AI
 
             AI->>AI: Build request payload
-            Note over AI: Add files as fileData parts<br/>Add system instruction<br/>Add Drive functions
+            Note over AI: Add files as fileData parts<br/>Add system instruction<br/>Add Google Search & URL tools
 
             AI->>GeminiAPI: POST /v1beta/models/{model}:generateContent
             GeminiAPI-->>AI: response
 
-            alt Response contains functionCall
-                AI->>AI: Extract function name & args
-                AI->>Vault: Execute function (getFile)
-                Vault-->>AI: function result
-                AI->>AI: Add result to contents
-                AI->>GeminiAPI: POST again with function result
-                GeminiAPI-->>AI: final response
-            end
-
             alt Error with retry count < 3
-                AI->>AI: Sleep 15 seconds
+                AI->>AI: Sleep 30 seconds
                 AI->>AI: Retry processCall()
             end
 
@@ -360,10 +345,10 @@ sequenceDiagram
   - System instruction from Drive file (agents_prompt)
   - All uploaded Drive files as context
   - Previous comments (maintaining conversation history)
-  - Drive function calling (getFile)
+  - Google Search and URL context tools enabled
 - **Sync Token**: Incremental sync to only process changed tasks
 - **Rate Limiting**: 10-second sleep between task enrichments
-- **Retry Logic**: AI calls retry up to 3 times with 15-second intervals
+- **Retry Logic**: AI calls retry up to 3 times with 30-second intervals
 - **Comment Prefix**: All AI responses prefixed with "AI: "
 
 ---
@@ -441,13 +426,10 @@ sequenceDiagram
         Vault-->>Processor: CALENDAR_INSTRUCTIONS_PROMPT
         Processor->>AI: buildTextContent('user', CALENDAR_INSTRUCTIONS_PROMPT)
 
-        Processor->>Vault: getDriveTools()
-        Vault-->>Processor: DRIVE_FUNCTIONS
-
-        Processor->>AI: processCall(contents, AGENTS_PROMPTS, [], [], DRIVE_FUNCTIONS)
+        Processor->>AI: processCall(contents, AGENTS_PROMPTS, files)
         activate AI
         AI->>GeminiAPI: POST /v1beta/models/{model}:generateContent
-        Note over AI,GeminiAPI: Request: events JSON,<br/>calendar instructions,<br/>system prompts, Drive functions
+        Note over AI,GeminiAPI: Request: events JSON,<br/>calendar instructions,<br/>system prompts, context files
         GeminiAPI-->>AI: JSON response
         AI-->>Processor: response text
         deactivate AI
@@ -1151,27 +1133,6 @@ if (VaultClient.wasUpdated(file) || PropertiesUtil.isFileExpired(file.getName())
 | **Brave Penguin** | Project context | 21 files (6%) | Moderate (2.7% daily) |
 | **Initiatives** | Strategic context | 13 files (5%) | Low (1.1% daily) |
 | **General** | Reference docs | 28 files (9%) | Low (1.0% daily) |
-
-**For complete vault optimization guide, API costs, and production best practices, see [PRODUCTION_GUIDE.md](./PRODUCTION_GUIDE.md).**
-
----
-
-## Production Deployment
-
-For production deployment, refer to **[PRODUCTION_GUIDE.md](./PRODUCTION_GUIDE.md)** which includes:
-
-- Complete trigger schedule with timing rationale
-- API cost estimation and optimization strategies
-- Vault context health monitoring
-- Gemini Flash vs. Pro cost comparison (88% savings)
-- Troubleshooting common issues
-- Weekly and monthly maintenance checklists
-- Production deployment checklist
-
-**Quick Stats:**
-- Estimated daily cost: $3.68/day with Gemini Pro, $0.44/day with Gemini Flash
-- Total API calls/day: ~16 Gemini calls, 288 vault checks, 144 task syncs
-- Vault refresh: Every 5 minutes (smart upload on change only)
 
 ---
 

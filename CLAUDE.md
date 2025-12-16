@@ -46,11 +46,11 @@ Main execution starts in `Main.js` which initializes `Processor.js` with extensi
 
 ### Important Files
 - **Processor.js**: Central orchestrator at Processor.js:1
-- **AI.js**: Gemini client with retry logic at AI.js:9
+- **AI.js**: Gemini client with retry logic at AI.js:22
 - **test.js**: Test configuration and functions at test.js:1
 
 ### Configuration Notes
 - API keys and IDs configured in `test.js` example
 - Drive folder IDs map to context sources (PEOPLE_FOLDER, TRIBE_FOLDER, etc.)
 - Prompt instructions stored as Google Drive file IDs
-- Properties Service handles caching and sync tokens
+- Properties Service handles file metadata and sync tokens
