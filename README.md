@@ -39,22 +39,7 @@ An intelligent automation system that orchestrates your life by integrating Goog
 
 ### Configuration
 
-1.  **Create your local configuration**
-    Copy the example configuration file to a local `test.js` file (which is git-ignored).
-    ```bash
-    cp src/test.js.example src/test.js
-    ```
-
-2.  **Update your secrets**
-    Edit `src/test.js` and fill in your API keys and IDs:
-    *   `gTaskListId`: ID of the Google Task list to monitor.
-    *   `calendarId`: Your Google Calendar ID (usually your email or 'primary').
-    *   `geminiApiKey`: API Key for Google Gemini.
-    *   `todoistApiKey`: API Key for Todoist.
-    *   `todoistProjectId`: ID of the Todoist project for new tasks.
-    *   `driveFolders`: Array of Google Drive folder IDs to use for AI context.
-
-3.  **Deploy Triggers**
+1.  **Deploy Triggers**
     Open the script in the Google Apps Script editor (`clasp open-script`) and set up time-driven triggers.
 
     **Core Triggers:**
@@ -617,7 +602,7 @@ sequenceDiagram
 
 ### Key Details:
 - **Trigger**: Time-driven, every 5 minutes
-- **Drive Folders**: Configured in test.js (PEOPLE_FOLDER, TRIBE_FOLDER, INITIATIVES, ITP_GENERAL, ITP_MEETINGS)
+- **Drive Folders**: Array of Google Drive folder IDs to use for AI context
 - **Update Criteria**:
   - File has no stored metadata
   - File's lastUpdated > stored updateTime

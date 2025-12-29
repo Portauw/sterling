@@ -18,9 +18,9 @@ clasp open    # Open project in Apps Script editor
 ```
 
 ### Testing
-Test functions are available in `test.js` and executed via Apps Script editor:
-- `test()`: Runs task enrichment process (`processor.enrichTodoistTasks()`)
-- `calendar()`: Processes calendar events (`processor.processCalendarItems()`)
+Test functions can be created and executed via Apps Script editor. Common test scenarios:
+- Run task enrichment process: `processor.enrichTodoistTasks()`
+- Process calendar events: `processor.processCalendarItems()`
 
 ## Key Architecture Points
 
@@ -47,10 +47,10 @@ Main execution starts in `Main.js` which initializes `Processor.js` with extensi
 ### Important Files
 - **Processor.js**: Central orchestrator at Processor.js:1
 - **AI.js**: Gemini client with retry logic at AI.js:22
-- **test.js**: Test configuration and functions at test.js:1
+- **Main.js**: Entry point and configuration at Main.js:26
 
 ### Configuration Notes
-- API keys and IDs configured in `test.js` example
-- Drive folder IDs map to context sources (PEOPLE_FOLDER, TRIBE_FOLDER, etc.)
+- API keys and IDs passed to main() function in Main.js
+- Drive folder IDs map to context sources for AI context
 - Prompt instructions stored as Google Drive file IDs
 - Properties Service handles file metadata and sync tokens
