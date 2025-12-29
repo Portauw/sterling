@@ -1023,9 +1023,7 @@ sequenceDiagram
 
 ---
 
-## Vault Context & Performance
-
-### Smart Context Sync
+## Smart Context Sync
 
 The `processContextData()` function implements intelligent caching to keep your AI context fresh while minimizing API usage:
 
@@ -1037,23 +1035,10 @@ if (VaultClient.wasUpdated(file) || PropertiesUtil.isFileExpired(file.getName())
 }
 ```
 
-**Current vault statistics:**
-- 211 markdown files across 5 folders
-- 1.07 MB total (~267K tokens for Gemini context)
-- 2.4% daily change rate (~5 files/day)
-- Smart sync: ~5-7 uploads/day despite 288 metadata checks
-
-**Result:** Near-real-time context freshness with minimal API costs.
-
-### Folder Structure
-
-| Folder | Purpose | Files | Update Frequency |
-|--------|---------|-------|------------------|
-| **People** | Relationship context | 116 files (63%) | High (2.6% daily) |
-| **Meetings** | Meeting notes & context | 33 files (16%) | High (3.0% daily) |
-| **Brave Penguin** | Project context | 21 files (6%) | Moderate (2.7% daily) |
-| **Initiatives** | Strategic context | 13 files (5%) | Low (1.1% daily) |
-| **General** | Reference docs | 28 files (9%) | Low (1.0% daily) |
+**Result:** Near-real-time context freshness with minimal API costs. The system only uploads files when:
+- File has been modified since last upload
+- File metadata has expired (>10 minutes)
+- Force update is requested
 
 ---
 
