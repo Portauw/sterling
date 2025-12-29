@@ -66,10 +66,7 @@ An intelligent automation system that orchestrates your life by integrating Goog
 
     **Optional High-Value Triggers:**
     *   `generateDailyBriefing` (daily 6-7 AM) - Executive summary task
-    *   `generateQuickWinsSummary` (daily 8-9 AM) - 2-minute task identification
-
-    **Maintenance:**
-    *   `processContextData` (every 5 mins) - Force refresh if needed
+    *   `generateQuickWinsSummary` (daily 6-7 AM) - 2-minute task identification
 
 ---
 
@@ -85,8 +82,8 @@ This document provides comprehensive visual documentation of all data flows in t
 - [Flow 4: Context Data Update](#flow-4-context-data-update)
 - [Flow 5: Data & State Management](#flow-5-data--state-management)
 - [Flow 6: Just-In-Time Task Preparation](#flow-6-just-in-time-task-preparation)
-- [Flow 8: Daily Briefing Generation](#flow-8-daily-briefing-generation)
-- [Flow 9: Quick Wins Summary](#flow-9-quick-wins-summary)
+- [Flow 7: Daily Briefing Generation](#flow-7-daily-briefing-generation)
+- [Flow 8: Quick Wins Summary](#flow-8-quick-wins-summary)
 
 ---
 
@@ -891,7 +888,7 @@ sequenceDiagram
 
 ---
 
-## Flow 8: Daily Briefing Generation
+## Flow 7: Daily Briefing Generation
 
 This flow generates a comprehensive daily briefing task that summarizes calendar events and tasks.
 
@@ -949,7 +946,7 @@ sequenceDiagram
 ```
 
 ### Key Details:
-- **Trigger**: Manual or scheduled (recommended: daily 6-7 AM)
+- **Trigger**: Manual or scheduled (recommended: daily between 6 AM and 7 AM)
 - **Data Sources**:
   - Calendar events for today
   - Tasks due today, overdue, or priority 1
@@ -963,7 +960,7 @@ sequenceDiagram
 
 ---
 
-## Flow 9: Quick Wins Summary
+## Flow 8: Quick Wins Summary
 
 This flow analyzes inbox tasks to identify quick 2-minute tasks and creates a summary.
 
@@ -1025,7 +1022,7 @@ sequenceDiagram
 ```
 
 ### Key Details:
-- **Trigger**: Manual or scheduled (recommended: daily 6-7 AM)
+- **Trigger**: Manual or scheduled (recommended: daily between 6 AM and 7 AM)
 - **Target**: Tasks in #Inbox project
 - **AI Analysis**:
   - Evaluates complexity and execution time
