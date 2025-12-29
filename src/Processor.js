@@ -37,13 +37,14 @@ const Processor = (function ({
   const CALENDAR_INSTRUCTIONS_PROMPT =
     VaultClient.getFile(promptInstructions.calendar_instructions_prompt);
   const AiClient = AI(
-    { geminiApiKey: geminiApiKey,
+    {
+      geminiApiKey: geminiApiKey,
       geminiModel: geminiModel
     });
   const CalendarClient = Calendar({ defaultCalendarId: calendarId });
 
   logger.info('Initialising processor completed');
-  
+
 
   function processContextData(forceUpdate = false) {
     var propertyNamesPropertyValue = [];
@@ -148,12 +149,13 @@ const Processor = (function ({
     try {
       const tasksResult = [];
       for (const task of tasks) {
-        if (!task.labels){
+        if (!task.labels) {
           task.labels = [];
         }
         switch (task.type) {
           case 'EMAIL':
-            task.labels.push('email')
+            task.labels.push('email');
+            task.labels.push(ENRICHT_LABEL);
             break;
           default:
             break;
@@ -260,25 +262,25 @@ const Processor = (function ({
           // 1. Identification Phase: Gather all tasks needing preparation
           // Process all filtered events in one go
           logger.info(`Processing ${filteredEvents.length} events for identification`);
-          
+
           const eventsWithContext = prepareCalendarEventsContext(filteredEvents);
           const tasksToSchedule = [];
 
           // Collect prep tasks
           for (const event of eventsWithContext.events) {
-             if (event.preparation) {
-                tasksToSchedule.push(event);
-             } else {
-                logger.info(`Not processing event ${event.title} since not needed.`);
-             }
+            if (event.preparation) {
+              tasksToSchedule.push(event);
+            } else {
+              logger.info(`Not processing event ${event.title} since not needed.`);
+            }
           }
 
           // 2. Scheduling Phase: Plan tasks to avoid overlaps
           if (tasksToSchedule.length > 0) {
-             const scheduledTasks = schedulePreparationTasks(tasksToSchedule, result.events, filteredEvents, bufferMinutes);
-             returnValue.push(...scheduledTasks);
+            const scheduledTasks = schedulePreparationTasks(tasksToSchedule, result.events, filteredEvents, bufferMinutes);
+            returnValue.push(...scheduledTasks);
           } else {
-             logger.info("No preparation tasks identified.");
+            logger.info("No preparation tasks identified.");
           }
 
         } else {
@@ -433,108 +435,108 @@ const Processor = (function ({
 
     for (const event of tasksToSchedule) {
       try {
-          logger.info(`Scheduling preparation for: ${event.title}`);
-          var date = new Date();
-          const eventStart = new Date(event.startTime);
-          // Use AI estimated duration or default to 45
-          logger.info(`Estimated duration: ${event.duration_estimation}`);
-          const duration = event.duration_estimation || 45;
-          
-          // Build busy lists with buffer applied (pre-build for performance)
-          // Apply buffer to calendar events and newly scheduled slots, but not to blocked periods
-          const allEventsBusyList = [
-            ...applyBuffer(allEvents),
-            ...applyBuffer(newlyScheduledSlots),
-            ...blockedPeriods.map(e => ({ startTime: e.startTime, endTime: e.endTime, title: e.title }))
-          ];
+        logger.info(`Scheduling preparation for: ${event.title}`);
+        var date = new Date();
+        const eventStart = new Date(event.startTime);
+        // Use AI estimated duration or default to 45
+        logger.info(`Estimated duration: ${event.duration_estimation}`);
+        const duration = event.duration_estimation || 45;
 
-          const lenientBusyList = [
-            ...applyBuffer(filteredEvents),
-            ...applyBuffer(newlyScheduledSlots),
-            ...blockedPeriods.map(e => ({ startTime: e.startTime, endTime: e.endTime, title: e.title }))
-          ];
+        // Build busy lists with buffer applied (pre-build for performance)
+        // Apply buffer to calendar events and newly scheduled slots, but not to blocked periods
+        const allEventsBusyList = [
+          ...applyBuffer(allEvents),
+          ...applyBuffer(newlyScheduledSlots),
+          ...blockedPeriods.map(e => ({ startTime: e.startTime, endTime: e.endTime, title: e.title }))
+        ];
 
-          // Strategy 1: Strict - Avoid ALL events (filtered + skipped/placeholders) + blocked periods
-          let scheduledTime = CalendarClient.findOpenSlot(allEventsBusyList, eventStart, duration);
-          let schedulingStrategy = "Strict (Clean slot)";
+        const lenientBusyList = [
+          ...applyBuffer(filteredEvents),
+          ...applyBuffer(newlyScheduledSlots),
+          ...blockedPeriods.map(e => ({ startTime: e.startTime, endTime: e.endTime, title: e.title }))
+        ];
 
-          // Strategy 2: Lenient - Avoid ONLY processed events (allow overlap with skipped/placeholders) + blocked periods
-          if (!scheduledTime) {
-              logger.info(`No strict slot found for ${event.title}. Trying lenient strategy (overlapping skipped events).`);
-              scheduledTime = CalendarClient.findOpenSlot(lenientBusyList, eventStart, duration);
-              schedulingStrategy = "Lenient (Overlapping skipped events)";
+        // Strategy 1: Strict - Avoid ALL events (filtered + skipped/placeholders) + blocked periods
+        let scheduledTime = CalendarClient.findOpenSlot(allEventsBusyList, eventStart, duration);
+        let schedulingStrategy = "Strict (Clean slot)";
+
+        // Strategy 2: Lenient - Avoid ONLY processed events (allow overlap with skipped/placeholders) + blocked periods
+        if (!scheduledTime) {
+          logger.info(`No strict slot found for ${event.title}. Trying lenient strategy (overlapping skipped events).`);
+          scheduledTime = CalendarClient.findOpenSlot(lenientBusyList, eventStart, duration);
+          schedulingStrategy = "Lenient (Overlapping skipped events)";
+        }
+
+        // Strategy 3: Reduced duration fallback - Try 30min, 15min, 10min with both strict and lenient
+        let actualDuration = duration;
+        if (!scheduledTime) {
+          logger.info(`No slot found with ${duration} min duration. Trying reduced durations.`);
+          const fallbackDurations = [30, 15, 10];
+
+          for (const reducedDuration of fallbackDurations) {
+            // Skip if reduced duration is same or larger than original
+            if (reducedDuration >= duration) continue;
+
+            logger.info(`Trying ${reducedDuration} min duration...`);
+
+            // Try strict strategy with reduced duration
+            scheduledTime = CalendarClient.findOpenSlot(allEventsBusyList, eventStart, reducedDuration);
+            if (scheduledTime) {
+              actualDuration = reducedDuration;
+              schedulingStrategy = `Strict (Reduced to ${reducedDuration} min)`;
+              logger.info(`Found strict slot with ${reducedDuration} min duration`);
+              break;
+            }
+
+            // Try lenient strategy with reduced duration (reuse pre-built list)
+            scheduledTime = CalendarClient.findOpenSlot(lenientBusyList, eventStart, reducedDuration);
+            if (scheduledTime) {
+              actualDuration = reducedDuration;
+              schedulingStrategy = `Lenient (Reduced to ${reducedDuration} min)`;
+              logger.info(`Found lenient slot with ${reducedDuration} min duration`);
+              break;
+            }
           }
+        }
 
-          // Strategy 3: Reduced duration fallback - Try 30min, 15min, 10min with both strict and lenient
-          let actualDuration = duration;
-          if (!scheduledTime) {
-              logger.info(`No slot found with ${duration} min duration. Trying reduced durations.`);
-              const fallbackDurations = [30, 15, 10];
+        if (scheduledTime) {
+          date = scheduledTime;
+          const endTime = new Date(date.getTime() + actualDuration * 60000);
+          logger.info(`Scheduled (${schedulingStrategy}) preparation for ${event.title} at ${date.toISOString()} - ${endTime.toISOString()} (${actualDuration} mins)`);
 
-              for (const reducedDuration of fallbackDurations) {
-                  // Skip if reduced duration is same or larger than original
-                  if (reducedDuration >= duration) continue;
+          // Add this new slot to our tracker
+          newlyScheduledSlots.push({
+            startTime: date.toISOString(),
+            endTime: endTime.toISOString(),
+            title: `Reserved: Prep for ${event.title}`
+          });
+        } else {
+          // Final fallback: Schedule 30 min before meeting
+          logger.warn(`No slot found even with reduced durations. Scheduling 30 min before meeting as last resort.`);
+          date = new Date(eventStart);
+          date.setMinutes(date.getMinutes() - 30);
+          actualDuration = 30;
+          schedulingStrategy = "Last resort (30 min before)";
+        }
 
-                  logger.info(`Trying ${reducedDuration} min duration...`);
+        const task = {
+          title: `Prepare for ${event.title}`,
+          description: event.meeting_preparation_prompt,
+          labels: [ENRICH_SCHEDULED],
+          due_date: date ? date.toISOString() : new Date().toISOString(),
+          project_id: todoistProjectId,
+          duration: actualDuration,
+          duration_unit: 'minute'
+        }
 
-                  // Try strict strategy with reduced duration
-                  scheduledTime = CalendarClient.findOpenSlot(allEventsBusyList, eventStart, reducedDuration);
-                  if (scheduledTime) {
-                      actualDuration = reducedDuration;
-                      schedulingStrategy = `Strict (Reduced to ${reducedDuration} min)`;
-                      logger.info(`Found strict slot with ${reducedDuration} min duration`);
-                      break;
-                  }
+        const todoistTask = createTodoistTasks([task]);
+        scheduledTasks.push(todoistTask);
 
-                  // Try lenient strategy with reduced duration (reuse pre-built list)
-                  scheduledTime = CalendarClient.findOpenSlot(lenientBusyList, eventStart, reducedDuration);
-                  if (scheduledTime) {
-                      actualDuration = reducedDuration;
-                      schedulingStrategy = `Lenient (Reduced to ${reducedDuration} min)`;
-                      logger.info(`Found lenient slot with ${reducedDuration} min duration`);
-                      break;
-                  }
-              }
-          }
-
-          if (scheduledTime) {
-            date = scheduledTime;
-            const endTime = new Date(date.getTime() + actualDuration * 60000);
-            logger.info(`Scheduled (${schedulingStrategy}) preparation for ${event.title} at ${date.toISOString()} - ${endTime.toISOString()} (${actualDuration} mins)`);
-
-            // Add this new slot to our tracker
-            newlyScheduledSlots.push({
-                startTime: date.toISOString(),
-                endTime: endTime.toISOString(),
-                title: `Reserved: Prep for ${event.title}`
-            });
-          } else {
-            // Final fallback: Schedule 30 min before meeting
-            logger.warn(`No slot found even with reduced durations. Scheduling 30 min before meeting as last resort.`);
-            date = new Date(eventStart);
-            date.setMinutes(date.getMinutes() - 30);
-            actualDuration = 30;
-            schedulingStrategy = "Last resort (30 min before)";
-          }
-
-          const task = {
-              title: `Prepare for ${event.title}`,
-              description: event.meeting_preparation_prompt,
-              labels: [ENRICH_SCHEDULED],
-              due_date: date ? date.toISOString() : new Date().toISOString(),
-              project_id: todoistProjectId,
-              duration: actualDuration,
-              duration_unit: 'minute'
-          }
-
-          const todoistTask = createTodoistTasks([task]);
-          scheduledTasks.push(todoistTask);
-          
-          // Rate limiting for task creation
-          Utilities.sleep(2 * 1000);
+        // Rate limiting for task creation
+        Utilities.sleep(2 * 1000);
 
       } catch (err) {
-          logger.error(`Error during scheduling event ${event.title}. Due to ${err}`);
+        logger.error(`Error during scheduling event ${event.title}. Due to ${err}`);
       }
     }
     return scheduledTasks;
@@ -745,22 +747,22 @@ const Processor = (function ({
   }
 
   function aiFileManagement() {
-    const grouping ={};
+    const grouping = {};
     const aifiles = AiClient.getFiles();
     logger.info(`Amount of files: ${aifiles.length}`);
-    for (const file of aifiles){
+    for (const file of aifiles) {
       logger.info(`${file.name} - ${file.displayName}`);
-      if (!grouping[file.displayName]){
+      if (!grouping[file.displayName]) {
         grouping[file.displayName] = [file];
-      }else {
+      } else {
         grouping[file.displayName] = [...grouping[file.displayName], file];
       }
     }
     for (const [key, value] of Object.entries(grouping)) {
-      if (value.length > 1){
+      if (value.length > 1) {
         logger.info(`size: ${value.length} - ${JSON.stringify(value.slice(1))}`)
         const sliced = value.slice(1);
-        for (const f of sliced){
+        for (const f of sliced) {
           logger.info(AiClient.deleteFile(f.name));
         }
       }
