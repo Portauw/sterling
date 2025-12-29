@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Commit Instructions
+
+**IMPORTANT**: Do NOT add any "Generated with Claude Code" or "Co-Authored-By" footers to commit messages. Keep commit messages clean and professional without attribution footers.
+
 ## Project Context
 
 For comprehensive project overview, architecture, and implementation details, see **AGENTS.md** which contains the complete technical documentation.
