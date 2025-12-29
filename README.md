@@ -2,6 +2,8 @@
 
 An intelligent automation system that orchestrates your life by integrating Google Tasks, Todoist, Google Calendar, and Gemini AI.
 
+<a href="https://buymeacoffee.com/pieterportauw" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+
 ## Documentation
 
 - **[AGENTS.md](./AGENTS.md)** - Comprehensive technical documentation and implementation details
