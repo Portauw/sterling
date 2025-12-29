@@ -69,7 +69,7 @@ An intelligent automation system that orchestrates your life by integrating Goog
     *   `generateQuickWinsSummary` (daily 8-9 AM) - 2-minute task identification
 
     **Maintenance:**
-    *   `aiFileManagement` (manual or weekly) - Cleanup duplicates
+    *   `processContextData` (every 5 mins) - Force refresh if needed
 
 ---
 
@@ -85,7 +85,6 @@ This document provides comprehensive visual documentation of all data flows in t
 - [Flow 4: Context Data Update](#flow-4-context-data-update)
 - [Flow 5: Data & State Management](#flow-5-data--state-management)
 - [Flow 6: Just-In-Time Task Preparation](#flow-6-just-in-time-task-preparation)
-- [Flow 7: AI File Management](#flow-7-ai-file-management)
 - [Flow 8: Daily Briefing Generation](#flow-8-daily-briefing-generation)
 - [Flow 9: Quick Wins Summary](#flow-9-quick-wins-summary)
 
@@ -147,7 +146,7 @@ graph TB
 | Component | Responsibility | Key Methods |
 |-----------|---------------|-------------|
 | **Main.js** | Entry point, configuration initialization | `main()` |
-| **Processor.js** | Central orchestrator for all workflows | `enrichTodoistTasks()`, `processGoogleTasks()`, `processCalendarItems()`, `processContextData()`, `enrichTodaysTasksForLabel()`, `aiFileManagement()`, `generateDailyBriefing()`, `generateQuickWinsSummary()` |
+| **Processor.js** | Central orchestrator for all workflows | `enrichTodoistTasks()`, `processGoogleTasks()`, `processCalendarItems()`, `processContextData()`, `enrichTodaysTasksForLabel()`, `generateDailyBriefing()`, `generateQuickWinsSummary()` |
 | **Todoist.js** | Todoist API integration, task & comment management | `createTask()`, `getUpdatedTasks()`, `createComment()`, `getTasksByFilter()`, `deleteComments()`, `updateTask()` |
 | **GoogleTask.js** | Google Tasks API integration | `listTaskLists()`, `markGoogleTasksDone()` |
 | **AI.js** | Gemini AI client with file upload and retry logic | `processCall()`, `uploadFile()`, `getFiles()`, `deleteFile()`, `deleteFileByDisplayName()`, `buildTextContent()`, `buildFileParts()` |
@@ -784,7 +783,6 @@ graph TB
   processCalendarItems,      // Flow 3: Calendar Event Processing
   processContextData,        // Flow 4: Context Data Update
   enrichTodaysTasksForLabel, // Flow 6: Just-In-Time Task Preparation
-  aiFileManagement,          // Flow 7: AI File Management
   generateDailyBriefing,     // Generate daily briefing task
   generateQuickWinsSummary   // Generate quick wins summary from inbox
 }
@@ -889,65 +887,6 @@ sequenceDiagram
 - **Use Case**: Batch preparation of daily tasks at start of day
 
 ---
-
-## Flow 7: AI File Management
-
-This flow manages Gemini AI file uploads, detecting and removing duplicate files to optimize storage.
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Processor
-    participant AI
-    participant PropsUtil
-    participant GeminiAPI
-
-    User->>Processor: aiFileManagement()
-    activate Processor
-
-    Processor->>AI: getFiles()
-    activate AI
-    AI->>PropsUtil: Get FILE_PROPERTIES keys
-    PropsUtil-->>AI: file metadata keys
-
-    loop For each file meta
-        AI->>PropsUtil: Get file metadata
-        PropsUtil-->>AI: {name, uri, mimeType, displayName}
-    end
-
-    AI-->>Processor: files[] (all Gemini files)
-    deactivate AI
-
-    Processor->>Processor: Group by displayName
-    Note over Processor: Identify duplicates:<br/>Files with same displayName
-
-    loop For each displayName with duplicates
-        Processor->>Processor: Keep first file, mark rest for deletion
-        Note over Processor: files.slice(1) = duplicates to delete
-
-        loop For each duplicate file
-            Processor->>AI: deleteFile(file.name)
-            activate AI
-            AI->>GeminiAPI: DELETE /v1beta/files/{name}
-            GeminiAPI-->>AI: deletion confirmed
-            AI-->>Processor: success
-            deactivate AI
-
-            Note over Processor: Log deletion result
-        end
-    end
-
-    Processor-->>User: Complete
-    deactivate Processor
-```
-
-### Key Details:
-- **Trigger**: Manual execution or scheduled maintenance
-- **Purpose**: Clean up duplicate Gemini file uploads
-- **Duplicate Detection**: Groups files by `displayName` field
-- **Deletion Strategy**: Keeps first occurrence, deletes subsequent duplicates
-- **Logging**: Detailed logs of file counts and deletions
-- **Use Case**: Prevents storage bloat from repeated file uploads with same name
 - **Safety**: Only deletes from Gemini API, doesn't affect Drive files
 
 ---

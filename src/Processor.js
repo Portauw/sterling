@@ -746,29 +746,6 @@ const Processor = (function ({
     }
   }
 
-  function aiFileManagement() {
-    const grouping = {};
-    const aifiles = AiClient.getFiles();
-    logger.info(`Amount of files: ${aifiles.length}`);
-    for (const file of aifiles) {
-      logger.info(`${file.name} - ${file.displayName}`);
-      if (!grouping[file.displayName]) {
-        grouping[file.displayName] = [file];
-      } else {
-        grouping[file.displayName] = [...grouping[file.displayName], file];
-      }
-    }
-    for (const [key, value] of Object.entries(grouping)) {
-      if (value.length > 1) {
-        logger.info(`size: ${value.length} - ${JSON.stringify(value.slice(1))}`)
-        const sliced = value.slice(1);
-        for (const f of sliced) {
-          logger.info(AiClient.deleteFile(f.name));
-        }
-      }
-    }
-  }
-
   function validateConfiguration(config) {
     const errors = [];
 
@@ -890,7 +867,6 @@ const Processor = (function ({
     processContextData,
     enrichTodaysTasksForLabel,
     processCalendarItems,
-    aiFileManagement,
     generateDailyBriefing,
     generateQuickWinsSummary
   }
