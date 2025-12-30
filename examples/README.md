@@ -135,6 +135,7 @@ The `doPost(e)` function enables real-time task enrichment triggered by Todoist 
    - **Events to watch**: Select the events that should trigger enrichment:
      - `item:added` - New tasks created
      - `item:updated` - Existing tasks updated
+     - `note:added` - Comments/notes added (required for @ai comment feature)
 6. Click **Save**
 
 ### Step 3: Test the Webhook
@@ -178,7 +179,7 @@ You can have a **conversational back-and-forth** with Sterling AI by adding comm
 
 **How @ai comments work:**
 
-- **Trigger**: Adding a comment starting with `@ai` triggers the webhook (via `item:updated` event)
+- **Trigger**: Adding a comment starting with `@ai` triggers the webhook (via `note:added` event)
 - **Processing**: Sterling detects the @ai comment and sends it to Gemini AI along with the task context
 - **Response**: AI generates a contextual response and adds it as a new task comment
 - **Conversation**: The entire comment thread becomes context for future @ai questions
