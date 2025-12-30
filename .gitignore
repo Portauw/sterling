@@ -32,10 +32,13 @@ ai-assistant/
 
 # Node.js dependencies and tooling
 node_modules/
-package.json
 package-lock.json
 knip.json
 analyze-dead-code.js
 
-# Documentation
-docs/
+# Personal content
+docs/blogs/
+docs/plans/
+AGENTS.md
+CLAUDE.md
+GEMINI.md

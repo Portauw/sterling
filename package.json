@@ -1,0 +1,39 @@
+{
+  "name": "Sterling",
+  "version": "1.0.0",
+  "description": "A Google Apps Script library for intelligent task automation, integrating Google Tasks, Todoist, Google Calendar, and Gemini AI",
+  "keywords": [
+    "google-apps-script",
+    "todoist",
+    "google-tasks",
+    "google-calendar",
+    "gemini",
+    "ai-automation",
+    "task-management",
+    "productivity"
+  ],
+  "author": "Pieter Portauw",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Portauw/sterling.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Portauw/sterling/issues"
+  },
+  "homepage": "https://github.com/Portauw/sterling#readme",
+  "scripts": {
+    "knip": "knip",
+    "analyze-dead-code": "node analyze-dead-code.js",
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "open": "clasp open"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "knip": "^5.71.0"
+  }
+}
