@@ -59,7 +59,7 @@ clasp create --type standalone --title "Sterling Library"
 clasp push
 
 # Open in Apps Script editor
-clasp open
+clasp open-script
 ```
 
 In the Apps Script editor:

@@ -27,7 +27,7 @@
     "analyze-dead-code": "node analyze-dead-code.js",
     "push": "clasp push",
     "pull": "clasp pull",
-    "open": "clasp open"
+    "open": "clasp open-script"
   },
   "engines": {
     "node": ">=14.0.0"
