@@ -22,24 +22,15 @@ Sterling is a **Google Apps Script library** that you deploy once and use across
 
 **2. Google Cloud Project**
 
-Create a new Google Cloud Project and enable the following APIs:
+Create a new Google Cloud Project:
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project (or select existing)
-3. Enable these APIs (search for each in the API Library):
-   - **Google Tasks API**
-   - **Google Calendar API**
-   - **Google Drive API**
-   - **Generative Language API** (for Gemini)
-   - **Google Apps Script API**
-
-📚 [How to enable APIs](https://support.google.com/googleapi/answer/6158841)
-
-**3. Note your GCP Project Number**
-- In Google Cloud Console, go to **Dashboard**
-- Copy your **Project Number** (you'll need this later)
+3. Note your **Project Number** from the Dashboard (you'll need this later)
 
 📚 [How to find your project number](https://support.google.com/googleapi/answer/7014113)
+
+> **Note:** Apps Script will automatically request permissions for required services (Tasks, Calendar, Drive, etc.) when you first run the script.
 
 ---
 

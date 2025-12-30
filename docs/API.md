@@ -399,15 +399,17 @@ function identifyQuickWins() {
 
 ## Configuration Reference
 
-### Required APIs
+### Required Services
 
-Enable these in your [Google Cloud Project](https://console.cloud.google.com/):
+Sterling uses the following Google services:
 
 1. **Google Tasks API** - For task synchronization
 2. **Google Calendar API** - For calendar event processing
 3. **Google Drive API** - For context file access
 4. **Generative Language API** (Gemini) - For AI features
 5. **Google Apps Script API** - For library deployment
+
+> **Note:** Apps Script will automatically request permissions for these services when you first run the script. No manual API enabling is required.
 
 ### Getting API Keys & IDs
 
