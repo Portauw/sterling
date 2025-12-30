@@ -164,6 +164,34 @@ function doPost(e) {
 }
 ```
 
+### Interactive Task Refinement with @ai Comments
+
+You can have a **conversational back-and-forth** with Sterling AI by adding comments to your Todoist tasks that start with `@ai`:
+
+**Example workflow:**
+
+1. **Create a task** in Todoist: "Plan team retrospective"
+2. **Add the "enrich" label** - Sterling AI automatically adds context and suggestions via a comment
+3. **Ask follow-up questions** by adding a comment: `@ai What are some effective retrospective formats for remote teams?`
+4. **Sterling responds** with a new comment containing AI-generated insights
+5. **Continue the conversation**: `@ai Focus on time-boxed activities under 30 minutes`
+
+**How @ai comments work:**
+
+- **Trigger**: Adding a comment starting with `@ai` triggers the webhook (via `item:updated` event)
+- **Processing**: Sterling detects the @ai comment and sends it to Gemini AI along with the task context
+- **Response**: AI generates a contextual response and adds it as a new task comment
+- **Conversation**: The entire comment thread becomes context for future @ai questions
+
+**Use cases:**
+
+- **Clarify requirements**: `@ai What resources would I need for this?`
+- **Break down tasks**: `@ai Split this into smaller subtasks`
+- **Get alternatives**: `@ai What are other approaches to solve this?`
+- **Add context**: `@ai Consider that this needs to be done before the Friday deadline`
+
+> **Note**: Make sure the task has the "enrich" label for @ai comments to be processed. The webhook will trigger on any task update, but only tasks with the "enrich" label will be processed by `enrichTodoistTasks()`.
+
 ### Troubleshooting
 
 **Webhook not triggering:**
