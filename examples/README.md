@@ -106,6 +106,78 @@ Set up time-driven triggers in your Google Apps Script project:
 
 ---
 
+## Setting Up Todoist Webhooks
+
+The `doPost(e)` function enables real-time task enrichment triggered by Todoist webhooks. When you create or update a task in Todoist, the webhook can automatically trigger Sterling's AI enrichment.
+
+### Step 1: Deploy Your Script as a Web App
+
+1. In your Apps Script project editor, click **Deploy** → **New deployment**
+2. Click the gear icon ⚙️ next to "Select type" and choose **Web app**
+3. Configure the deployment:
+   - **Description**: "Todoist Webhook Handler" (or any description)
+   - **Execute as**: Me (your email)
+   - **Who has access**: Anyone
+4. Click **Deploy**
+5. **Copy the Web App URL** - you'll need this for Todoist webhook configuration
+   - Format: `https://script.google.com/macros/s/SCRIPT_ID/exec`
+
+> **Note**: If you make changes to your code, you need to create a **New deployment** (not just save). Click **Deploy** → **Manage deployments** → **Edit** → **Version: New version** → **Deploy**.
+
+### Step 2: Configure Todoist Webhook
+
+1. Go to [Todoist App Management](https://developer.todoist.com/appconsole.html)
+2. Select your app (or create a new one if you don't have one)
+3. Scroll to **Webhooks** section
+4. Click **Add webhook**
+5. Configure the webhook:
+   - **Webhook callback URL**: Paste your Web App URL from Step 1
+   - **Events to watch**: Select the events that should trigger enrichment:
+     - `item:added` - New tasks created
+     - `item:updated` - Existing tasks updated
+6. Click **Save**
+
+### Step 3: Test the Webhook
+
+1. Create a new task in Todoist with the "enrich" label
+2. The webhook should trigger your `doPost(e)` function
+3. Check your Apps Script project's **Executions** log to verify:
+   - Click **Executions** (play icon) in the left sidebar
+   - Look for recent executions of `doPost`
+4. The task should be automatically enriched with AI-generated content
+
+### How It Works
+
+When Todoist sends a webhook event:
+
+1. **Todoist** detects a task change (created/updated)
+2. **Webhook fires** to your Web App URL
+3. **doPost(e) receives** the webhook payload
+4. **processor.enrichTodoistTasks()** runs to process tasks with the "enrich" label
+5. **Sterling AI** enriches the task with context and details
+
+The `doPost(e)` implementation in Example.js:
+
+```javascript
+function doPost(e) {
+    processor.enrichTodoistTasks();
+}
+```
+
+### Troubleshooting
+
+**Webhook not triggering:**
+- Verify the Web App URL is correct in Todoist webhook settings
+- Ensure **Who has access** is set to "Anyone" in deployment settings
+- Check Apps Script **Executions** log for errors
+
+**Enrichment not working:**
+- Verify tasks have the "enrich" label
+- Check your Gemini API key is valid
+- Review the Apps Script logs for error messages
+
+---
+
 ## Additional Resources:
 
 - [Sterling API Documentation](../docs/API.md) - Detailed API reference for all methods
