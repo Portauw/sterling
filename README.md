@@ -4,8 +4,8 @@ A Google Apps Script library for intelligent task automation, integrating Google
 
 <a href="https://buymeacoffee.com/pieterportauw" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-Library-blue.svg)](https://developers.google.com/apps-script)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Portauw/sterling/blob/master/LICENSE)
+[![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-Library-blue.svg)](https://developers.google.com/apps-script/guides/libraries)
 
 ---
 
